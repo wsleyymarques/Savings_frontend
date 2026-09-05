@@ -1,0 +1,176 @@
+import { NavLink } from 'react-router-dom'
+import { formatMoney } from '../../lib/money'
+import { useDrawer, useScope, useSession } from '../../app/contexts'
+import { useAccountScope } from '../../app/useScopeLabel'
+import { useTransactionsCountQuery } from '../../services/queries'
+import { sum } from '../../lib/money'
+import { initialsOf } from '../../lib/initials'
+import { Icon, type IconName } from '../ui/Icon'
+import { DropdownMenu, MenuItem, MenuLabel, MenuSeparator } from '../ui/DropdownMenu'
+
+const NAV_ITEMS: { to: string; label: string; icon: IconName }[] = [
+  { to: '/visao-geral', label: 'Visão geral', icon: 'visao-geral' },
+  { to: '/lancamentos', label: 'Lançamentos', icon: 'lancamentos' },
+  { to: '/contas', label: 'Contas', icon: 'contas' },
+  { to: '/cartoes', label: 'Cartões', icon: 'cartoes' },
+  { to: '/faturas', label: 'Faturas', icon: 'faturas' },
+  { to: '/categorias', label: 'Categorias', icon: 'categorias' },
+]
+
+interface SidebarProps {
+  open: boolean
+  onNavigate: () => void
+}
+
+export function Sidebar({ open, onNavigate }: SidebarProps) {
+  const { accountId, setAccountId } = useScope()
+  const { accounts, accountsQuery, scopeLabel } = useAccountScope()
+  const { user, signOut, status } = useSession()
+  const drawer = useDrawer()
+
+  const consolidated = sum(accounts.map((account) => account.currentBalance))
+  const selected = accounts.find((account) => account.id === accountId)
+  const scopeBalance = selected ? selected.currentBalance : consolidated
+
+  // Contagem real da listagem sob o escopo atual; oculta enquanto não estiver disponível.
+  const count = useTransactionsCountQuery({ accountId }, status === 'authenticated')
+
+  return (
+    <nav
+      className={['sidebar', open ? 'sidebar--open' : ''].filter(Boolean).join(' ')}
+      aria-label="Navegação principal"
+      id="navegacao-principal"
+    >
+      <NavLink className="sidebar__brand" to="/visao-geral" onClick={onNavigate}>
+        <span className="sidebar__mark" aria-hidden="true" />
+        Minhas Finanças
+      </NavLink>
+
+      <div className="sidebar__scope">
+        <DropdownMenu
+          label="Escolher conta financeira"
+          trigger={({ ref, ...props }) => (
+            <button ref={ref} type="button" className="scope" {...props}>
+              <span className="scope__top">
+                <span className="scope__eyebrow">CONTA ATIVA</span>
+                {accountsQuery.isSuccess ? (
+                  <span className="scope__balance">{formatMoney(scopeBalance)}</span>
+                ) : null}
+              </span>
+              <span className="scope__bottom">
+                <span className="scope__name">
+                  {accountsQuery.isSuccess && accounts.length === 0 ? 'Nenhuma conta' : scopeLabel}
+                </span>
+                <Icon name="chevron-updown" size={18} className="scope__chevron" />
+              </span>
+            </button>
+          )}
+        >
+          {(close) => (
+            <>
+              <MenuLabel>Escopo dos dados financeiros</MenuLabel>
+              {accounts.length === 0 ? (
+                <MenuItem
+                  onClick={() => {
+                    close()
+                    drawer.open({ kind: 'conta' })
+                  }}
+                >
+                  Criar conta
+                </MenuItem>
+              ) : (
+                <>
+                  <MenuItem
+                    checked={accountId === null}
+                    detail={formatMoney(consolidated)}
+                    onClick={() => {
+                      setAccountId(null)
+                      close()
+                    }}
+                  >
+                    Todas as contas
+                  </MenuItem>
+                  <MenuSeparator />
+                  {accounts.map((account) => (
+                    <MenuItem
+                      key={account.id}
+                      checked={accountId === account.id}
+                      detail={formatMoney(account.currentBalance)}
+                      onClick={() => {
+                        setAccountId(account.id)
+                        close()
+                      }}
+                    >
+                      {account.name}
+                    </MenuItem>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+        </DropdownMenu>
+      </div>
+
+      <ul className="sidebar__nav">
+        {NAV_ITEMS.map((item) => (
+          <li key={item.to}>
+            <NavLink
+              to={item.to}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                ['nav-item', isActive ? 'nav-item--active' : ''].filter(Boolean).join(' ')
+              }
+            >
+              <Icon name={item.icon} />
+              <span className="nav-item__label">{item.label}</span>
+              {item.to === '/lancamentos' && count.isSuccess && count.data > 0 ? (
+                <span className="nav-item__badge">{count.data}</span>
+              ) : null}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+
+      <div className="sidebar__spacer" />
+
+      <div className="sidebar__user">
+        <DropdownMenu
+          label="Menu do usuário"
+          placement="top"
+          trigger={({ ref, ...props }) => (
+            <button ref={ref} type="button" className="user-button" {...props}>
+              <span className="user-avatar" aria-hidden="true">
+                {initialsOf(user?.name ?? '')}
+              </span>
+              <span className="user-button__text">
+                <span className="user-button__name" title={user?.name}>
+                  {user?.name ?? 'Usuário'}
+                </span>
+                <span className="user-button__email" title={user?.email}>
+                  {user?.email ?? ''}
+                </span>
+              </span>
+              <Icon name="chevron-updown" size={18} />
+            </button>
+          )}
+        >
+          {(close) => (
+            <>
+              <MenuItem
+                onClick={() => {
+                  close()
+                  drawer.open({ kind: 'perfil' })
+                }}
+              >
+                Meu perfil
+              </MenuItem>
+              <MenuItem onClick={() => void signOut('trocar')}>Trocar usuário</MenuItem>
+              <MenuSeparator />
+              <MenuItem onClick={() => void signOut('sair')}>Sair</MenuItem>
+            </>
+          )}
+        </DropdownMenu>
+      </div>
+    </nav>
+  )
+}

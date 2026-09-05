@@ -1,0 +1,56 @@
+/* Origem única dos tokens definidos em design.md, seção 3. */
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-canvas: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f1f5f9;
+  --color-account-selector: #f5f3ff;
+  --color-text: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --color-control-border: #94a3b8;
+  --color-brand: #059669;
+  --color-action: #047857;
+  --color-action-hover: #065f46;
+  --color-action-pressed: #064e3b;
+  --color-on-action: #ffffff;
+  --color-success-bg: #d1fae5;
+  --color-success-text: #065f46;
+  --color-danger: #b91c1c;
+  --color-danger-hover: #991b1b;
+  --color-danger-bg: #fef2f2;
+  --color-warning-bg: #fffbeb;
+  --color-warning-text: #92400e;
+  --color-info-bg: #eff6ff;
+  --color-info-text: #1d4ed8;
+  --color-overlay: rgb(15 23 42 / 20%);
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --radius-control: 8px;
+  --radius-panel: 12px;
+  --radius-pill: 999px;
+  --sidebar-width: 240px;
+  --drawer-width: 520px;
+  --control-height: 44px;
+  --button-height: 40px;
+  --shadow-popover: 0 8px 24px rgb(15 23 42 / 10%);
+  --shadow-drawer: -8px 0 32px rgb(15 23 42 / 12%);
+  --duration-fast: 120ms;
+  --duration-panel: 180ms;
+
+  /* Camadas (design.md, seção 6). */
+  --z-content: 0;
+  --z-sidebar: 20;
+  --z-nav-overlay: 40;
+  --z-nav-panel: 41;
+  --z-drawer-overlay: 60;
+  --z-drawer: 61;
+  --z-drawer-popover: 70;
+  --z-toast: 80;
+}
