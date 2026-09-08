@@ -157,10 +157,14 @@ export function toCategoryRow(category: ApiCategory): CategoryRow {
 export function toEntryRow(transaction: ApiTransaction): EntryRow {
   const kind = TYPE_FROM_API[transaction.type]
   const amount = decimalToCents(transaction.amount)
+  const recurringSeries =
+    transaction.entryMode === 'RECURRING' && Boolean(transaction.recurringRuleId)
   return {
     id: `${kind}-${transaction.id}`,
     kind,
-    sourceId: transaction.id,
+    sourceId: recurringSeries && transaction.recurringRuleId
+      ? transaction.recurringRuleId
+      : transaction.id,
     date: transaction.effectiveDate,
     description: transaction.description,
     categoryLabel: transaction.category?.name ?? null,
@@ -169,9 +173,13 @@ export function toEntryRow(transaction: ApiTransaction): EntryRow {
     cardName: transaction.card?.name ?? null,
     method: methodFromApi(transaction.paymentMethod),
     amount: kind === 'receita' ? amount : -amount,
-    // A API da V1 não expõe edição de lançamento: as regras de correção
-    // continuam abertas no SDD, então a ação não é oferecida.
-    editable: false,
+    editable:
+      kind === 'receita' ||
+      (kind === 'despesa' && (transaction.entryMode === 'ONE_TIME' || recurringSeries)),
+    projected: Boolean(transaction.projected),
+    recurringRuleId: transaction.recurringRuleId,
+    personalCommitmentId: transaction.personalCommitmentId ?? null,
+    beneficiaryName: transaction.beneficiaryName ?? null,
     expenseMode: MODE_FROM_API[transaction.entryMode ?? 'ONE_TIME'],
     installmentNumber: transaction.installmentNumber,
     installmentCount: transaction.installmentCount,

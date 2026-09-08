@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react'
+import { forwardRef, type ButtonHTMLAttributes } from 'react'
 import { Icon, type IconName } from './Icon'
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -8,9 +8,13 @@ interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   outlined?: boolean
 }
 
-export function IconButton({ icon, label, outlined = false, className, ...props }: IconButtonProps) {
+export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(function IconButton(
+  { icon, label, outlined = false, className, ...props },
+  ref,
+) {
   return (
     <button
+      ref={ref}
       type="button"
       className={['icon-btn', outlined ? 'icon-btn--outlined' : '', className ?? '']
         .filter(Boolean)
@@ -22,4 +26,4 @@ export function IconButton({ icon, label, outlined = false, className, ...props 
       <Icon name={icon} />
     </button>
   )
-}
+})

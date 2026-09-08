@@ -88,6 +88,10 @@ export function toEntryRows(state: FinanceState, accountIds: Id[], today: CivilD
     const expense = row.kind === 'despesa' ? state.expenses.find((item) => item.id === row.sourceId) : undefined
     return {
       ...row,
+      projected: false,
+      personalCommitmentId: null,
+      beneficiaryName: null,
+      recurringRuleId: null,
       categoryArchived: expense
         ? (findCategory(state, expense.categoryId)?.archived ?? false)
         : false,

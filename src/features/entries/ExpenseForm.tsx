@@ -25,6 +25,7 @@ import { DrawerRecord } from '../shared/DrawerFallback'
 
 interface ExpenseFormProps {
   expenseId?: Id
+  recurringRule?: boolean
   onClose: () => void
 }
 
@@ -41,10 +42,10 @@ const EXPENSE_MODE_OPTIONS: { value: ExpenseMode; label: string; hint: string }[
   { value: 'recorrente', label: 'Recorrente', hint: 'cobrança mensal' },
 ]
 
-export function ExpenseForm({ expenseId, onClose }: ExpenseFormProps) {
+export function ExpenseForm({ expenseId, recurringRule = false, onClose }: ExpenseFormProps) {
   const { accountId } = useScope()
   const { accounts } = useAccountScope()
-  const query = useExpenseQuery(expenseId)
+  const query = useExpenseQuery(expenseId, recurringRule)
 
   if (!expenseId) {
     return (
@@ -68,9 +69,15 @@ export function ExpenseForm({ expenseId, onClose }: ExpenseFormProps) {
   }
 
   return (
-    <DrawerRecord title="Editar gasto" query={query} onClose={onClose}>
+    <DrawerRecord title={recurringRule ? 'Editar recorrência' : 'Editar gasto'} query={query} onClose={onClose}>
       {(data) => (
-        <ExpenseFields title="Editar gasto" expenseId={expenseId} initial={data} onClose={onClose} />
+        <ExpenseFields
+          title={recurringRule ? 'Editar recorrência' : 'Editar gasto'}
+          expenseId={expenseId}
+          recurringRule={recurringRule}
+          initial={data}
+          onClose={onClose}
+        />
       )}
     </DrawerRecord>
   )
@@ -79,15 +86,16 @@ export function ExpenseForm({ expenseId, onClose }: ExpenseFormProps) {
 interface ExpenseFieldsProps {
   title: string
   expenseId?: Id
+  recurringRule?: boolean
   initial: ExpenseInput
   onClose: () => void
 }
 
-function ExpenseFields({ title, expenseId, initial, onClose }: ExpenseFieldsProps) {
+function ExpenseFields({ title, expenseId, recurringRule = false, initial, onClose }: ExpenseFieldsProps) {
   const { status } = useSession()
   const { accounts } = useAccountScope()
   const toast = useToast()
-  const expenseMutation = useExpenseMutation(expenseId)
+  const expenseMutation = useExpenseMutation(expenseId, recurringRule)
   const categoryMutation = useCategoryMutation()
 
   const cardsQuery = useCardsQuery({ accountId: null }, status === 'authenticated')
@@ -103,7 +111,7 @@ function ExpenseFields({ title, expenseId, initial, onClose }: ExpenseFieldsProp
     categoryId: initial.categoryId ?? '',
     expenseMode: initial.expenseMode ?? 'unica',
     installmentCount: String(initial.installmentCount ?? 2),
-    recurrenceMonths: '0',
+    recurrenceMonths: recurrenceDuration(initial.date, initial.recurrenceEndDate),
   })
 
   const [step, setStep] = useState<'gasto' | 'categoria'>('gasto')
@@ -201,7 +209,7 @@ function ExpenseFields({ title, expenseId, initial, onClose }: ExpenseFieldsProp
     )
 
     if (ok) {
-      toast.notify(expenseId ? 'Despesa atualizada' : 'Despesa registrada')
+      toast.notify(recurringRule ? 'Recorrência atualizada' : expenseId ? 'Despesa atualizada' : 'Despesa registrada')
       onClose()
     }
   }
@@ -285,16 +293,22 @@ function ExpenseFields({ title, expenseId, initial, onClose }: ExpenseFieldsProp
           onChange={(date) => form.patch({ date })}
         />
 
-        <RadioGroup
-          legend="Forma de pagamento"
-          name="forma-pagamento"
-          value={form.values.method}
-          options={METHOD_OPTIONS}
-          inline
-          onChange={handleMethodChange}
-        />
+        {recurringRule ? (
+          <InlineAlert tone="info" title="Recorrência mensal">
+            A edição altera esta e as próximas previsões. Cobranças já realizadas são preservadas.
+          </InlineAlert>
+        ) : (
+          <RadioGroup
+            legend="Forma de pagamento"
+            name="forma-pagamento"
+            value={form.values.method}
+            options={METHOD_OPTIONS}
+            inline
+            onChange={handleMethodChange}
+          />
+        )}
 
-        {form.values.method === 'credito' ? (
+        {form.values.method === 'credito' && !recurringRule ? (
           <RadioGroup
             legend="Tipo da despesa"
             name="tipo-despesa"
@@ -457,4 +471,12 @@ function ExpenseFields({ title, expenseId, initial, onClose }: ExpenseFieldsProp
       </div>
     </FormDrawer>
   )
+}
+
+function recurrenceDuration(start: string, end: string | null | undefined): string {
+  if (!end) return '0'
+  const [startYear, startMonth] = start.split('-').map(Number)
+  const [endYear, endMonth] = end.split('-').map(Number)
+  const months = (endYear - startYear) * 12 + endMonth - startMonth + 1
+  return ['3', '6', '12', '24'].includes(String(months)) ? String(months) : '0'
 }

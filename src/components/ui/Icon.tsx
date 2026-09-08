@@ -11,6 +11,7 @@ export type IconName =
   | 'cartoes'
   | 'faturas'
   | 'categorias'
+  | 'planejamento'
   | 'chevron-down'
   | 'chevron-updown'
   | 'chevron-right'
@@ -77,6 +78,12 @@ const PATHS: Record<IconName, JSX.Element> = {
       <circle cx="17.25" cy="6.75" r="3.75" />
       <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
       <path d="m17.25 13.5 3.75 7.5h-7.5Z" />
+    </>
+  ),
+  planejamento: (
+    <>
+      <path d="M12 3a6 6 0 0 0-3.7 10.7c.8.7 1.2 1.5 1.2 2.3h5c0-.8.4-1.6 1.2-2.3A6 6 0 0 0 12 3Z" />
+      <path d="M9.5 19h5M10.5 22h3" />
     </>
   ),
   'chevron-down': <path d="m6 9 6 6 6-6" />,

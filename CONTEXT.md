@@ -68,6 +68,38 @@ _Evitar_: Parcela, lançamento futuro.
 Despesa individual originada por uma regra de recorrência em uma data determinada.
 _Evitar_: Regra de recorrência, parcela.
 
+**Desejo**:
+Produto ou aquisição que a pessoa considera comprar, mas que ainda não faz parte de uma previsão financeira.
+_Evitar_: Despesa, gasto planejado.
+
+**Gasto planejado**:
+Cenário de uma compra provável com valor, forma de pagamento e conta ou cartão definidos, ainda sem efeito financeiro real.
+_Evitar_: Despesa, desejo.
+
+**Cenário planejado**:
+Projeção que combina os gastos planejados selecionados com a posição financeira atual, sem alterar saldo, limite ou fatura.
+_Evitar_: Saldo real, lançamento.
+
+**Realização de gasto planejado**:
+Conversão única de um gasto planejado em uma despesa efetiva, preservando a ligação entre a intenção e o lançamento criado.
+_Evitar_: Edição do planejamento, previsão.
+
+**Compromisso pessoal**:
+Obrigação de pagar uma pessoa em parcelas conhecidas ou de forma recorrente, acompanhada antes e depois de cada pagamento.
+_Evitar_: Desejo, compra parcelada, pois o compromisso representa pagamentos combinados com um beneficiário.
+
+**Beneficiário**:
+Pessoa que recebe os pagamentos de um compromisso pessoal.
+_Evitar_: Usuário, conta financeira.
+
+**Ocorrência de compromisso**:
+Pagamento individual previsto no calendário de um compromisso pessoal, ainda que esteja futuro, atrasado ou já pago.
+_Evitar_: Compromisso pessoal, pois uma obrigação pode originar várias ocorrências.
+
+**Pagamento de compromisso**:
+Realização de uma ocorrência de compromisso que origina uma despesa efetiva e deixa de ser apenas uma previsão.
+_Evitar_: Nova recorrência, quitação de fatura.
+
 **Categoria de despesa**:
 Classificação do motivo de um gasto, como Alimentação ou Moradia.
 _Evitar_: Forma de pagamento.

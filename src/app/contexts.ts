@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Id, User } from '../data/types'
+import type { CommitmentOccurrence } from '../services/contracts'
 
 /**
  * Context guarda apenas sessão, escopo de conta e estado de interface.
@@ -50,12 +51,20 @@ export function useScope(): ScopeValue {
 
 export type DrawerRequest =
   | { kind: 'receita'; id?: Id }
-  | { kind: 'gasto'; id?: Id }
+  | { kind: 'gasto'; id?: Id; recurringRule?: boolean }
   | { kind: 'conta'; id?: Id }
   | { kind: 'cartao'; id?: Id }
   | { kind: 'categoria'; id?: Id; accountId?: Id }
   | { kind: 'pagamento'; invoiceId: Id }
   | { kind: 'perfil' }
+  | { kind: 'desejo'; id?: Id }
+  | { kind: 'gasto-planejado'; id?: Id; wishId?: Id }
+  | { kind: 'realizar-gasto'; id: Id }
+  | { kind: 'compromisso'; id?: Id }
+  | { kind: 'pagar-compromisso'; id: Id; occurrence: CommitmentOccurrence }
+  | { kind: 'ciclo-meta'; id?: Id }
+  | { kind: 'objetivo-meta'; cycleId: Id; id?: Id }
+  | { kind: 'progresso-meta'; objectiveId: Id }
 
 export interface DrawerValue {
   request: DrawerRequest | null

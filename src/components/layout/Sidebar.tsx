@@ -8,13 +8,30 @@ import { initialsOf } from '../../lib/initials'
 import { Icon, type IconName } from '../ui/Icon'
 import { DropdownMenu, MenuItem, MenuLabel, MenuSeparator } from '../ui/DropdownMenu'
 
-const NAV_ITEMS: { to: string; label: string; icon: IconName }[] = [
-  { to: '/visao-geral', label: 'Visão geral', icon: 'visao-geral' },
-  { to: '/lancamentos', label: 'Lançamentos', icon: 'lancamentos' },
-  { to: '/contas', label: 'Contas', icon: 'contas' },
-  { to: '/cartoes', label: 'Cartões', icon: 'cartoes' },
-  { to: '/faturas', label: 'Faturas', icon: 'faturas' },
-  { to: '/categorias', label: 'Categorias', icon: 'categorias' },
+interface NavItem {
+  to: string
+  label: string
+  icon: IconName
+}
+
+/** Uma seção por aplicação do hub; a casca e a sessão são compartilhadas. */
+const NAV_SECTIONS: { app: string; items: NavItem[] }[] = [
+  {
+    app: 'Finanças',
+    items: [
+      { to: '/visao-geral', label: 'Visão geral', icon: 'visao-geral' },
+      { to: '/lancamentos', label: 'Lançamentos', icon: 'lancamentos' },
+      { to: '/planejamento', label: 'Planejamento', icon: 'planejamento' },
+      { to: '/contas', label: 'Contas', icon: 'contas' },
+      { to: '/cartoes', label: 'Cartões', icon: 'cartoes' },
+      { to: '/faturas', label: 'Faturas', icon: 'faturas' },
+      { to: '/categorias', label: 'Categorias', icon: 'categorias' },
+    ],
+  },
+  {
+    app: 'Metas',
+    items: [{ to: '/metas', label: 'Ciclos e objetivos', icon: 'trending' }],
+  },
 ]
 
 interface SidebarProps {
@@ -111,25 +128,30 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
         </DropdownMenu>
       </div>
 
-      <ul className="sidebar__nav">
-        {NAV_ITEMS.map((item) => (
-          <li key={item.to}>
-            <NavLink
-              to={item.to}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                ['nav-item', isActive ? 'nav-item--active' : ''].filter(Boolean).join(' ')
-              }
-            >
-              <Icon name={item.icon} />
-              <span className="nav-item__label">{item.label}</span>
-              {item.to === '/lancamentos' && count.isSuccess && count.data > 0 ? (
-                <span className="nav-item__badge">{count.data}</span>
-              ) : null}
-            </NavLink>
-          </li>
-        ))}
-      </ul>
+      {NAV_SECTIONS.map((section) => (
+        <div key={section.app} className="sidebar__section">
+          <p className="sidebar__section-label">{section.app}</p>
+          <ul className="sidebar__nav">
+            {section.items.map((item) => (
+              <li key={item.to}>
+                <NavLink
+                  to={item.to}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    ['nav-item', isActive ? 'nav-item--active' : ''].filter(Boolean).join(' ')
+                  }
+                >
+                  <Icon name={item.icon} />
+                  <span className="nav-item__label">{item.label}</span>
+                  {item.to === '/lancamentos' && count.isSuccess && count.data > 0 ? (
+                    <span className="nav-item__badge">{count.data}</span>
+                  ) : null}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ))}
 
       <div className="sidebar__spacer" />
 

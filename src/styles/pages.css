@@ -390,3 +390,39 @@
   .auth__card { padding: var(--space-6); }
   .item-row__value { text-align: left; }
 }
+
+/* Planejamento mantém projeções visualmente separadas dos valores realizados. */
+.planning-stack { display: grid; gap: var(--space-6); }
+.planning-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+.planning-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.planning-card-summary {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-subtle);
+}
+.planning-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 1000px) {
+  .planning-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+  .planning-stats { grid-template-columns: 1fr; }
+}

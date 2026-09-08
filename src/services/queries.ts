@@ -3,14 +3,20 @@ import { services } from './index'
 import { queryKeys } from './queryKeys'
 import type {
   AccountInput,
+  GoalCycleInput,
+  GoalObjectiveInput,
+  GoalProgressInput,
   CardInput,
   CategoryInput,
   ExpenseInput,
   IncomeInput,
   InvoicePaymentInput,
   OverviewParams,
+  PlannedExpenseInput,
+  PersonalCommitmentInput,
   ScopeParams,
   TransactionListParams,
+  WishInput,
 } from './contracts'
 import type { Id } from '../data/types'
 
@@ -64,10 +70,12 @@ export function useIncomeQuery(id: Id | undefined) {
   })
 }
 
-export function useExpenseQuery(id: Id | undefined) {
+export function useExpenseQuery(id: Id | undefined, recurring = false) {
   return useQuery({
-    queryKey: queryKeys.transactions.expense(id ?? ''),
-    queryFn: () => services.transactions.getExpense(id as Id),
+    queryKey: queryKeys.transactions.expense(`${recurring ? 'recurring-' : ''}${id ?? ''}`),
+    queryFn: () => recurring
+      ? services.transactions.getRecurringExpense(id as Id)
+      : services.transactions.getExpense(id as Id),
     enabled: Boolean(id),
   })
 }
@@ -123,9 +131,84 @@ export function useSelectableCategoriesQuery(params: ScopeParams, enabled = true
   })
 }
 
+export function useWishesQuery(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.planning.wishes,
+    queryFn: () => services.planning.listWishes(),
+    enabled,
+  })
+}
+
+export function useWishQuery(id: Id | undefined) {
+  return useQuery({
+    queryKey: queryKeys.planning.wish(id ?? ''),
+    queryFn: () => services.planning.getWish(id as Id),
+    enabled: Boolean(id),
+  })
+}
+
+export function usePlannedExpensesQuery(params: ScopeParams, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.planning.expenses(params),
+    queryFn: () => services.planning.listPlannedExpenses(params),
+    enabled,
+  })
+}
+
+export function usePlannedExpenseQuery(id: Id | undefined) {
+  return useQuery({
+    queryKey: queryKeys.planning.expense(id ?? ''),
+    queryFn: () => services.planning.getPlannedExpense(id as Id),
+    enabled: Boolean(id),
+  })
+}
+
+export function usePlanningSimulationQuery(params: ScopeParams, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.planning.simulation(params),
+    queryFn: () => services.planning.simulate(params),
+    enabled,
+  })
+}
+
+export function useCommitmentsQuery(params: ScopeParams, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.planning.commitments(params),
+    queryFn: () => services.planning.listCommitments(params),
+    enabled,
+  })
+}
+
+export function useCommitmentQuery(id: Id | undefined) {
+  return useQuery({
+    queryKey: queryKeys.planning.commitment(id ?? ''),
+    queryFn: () => services.planning.getCommitment(id as Id),
+    enabled: Boolean(id),
+  })
+}
+
+export function useCommitmentOccurrencesQuery(
+  params: ScopeParams & { start: string; end: string },
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: queryKeys.planning.commitmentOccurrences(params),
+    queryFn: () => services.planning.listCommitmentOccurrences(params),
+    enabled,
+  })
+}
+
 /* --------------------------------- Invalidação ------------------------------ */
 
-type Domain = 'overview' | 'accounts' | 'transactions' | 'cards' | 'invoices' | 'categories'
+type Domain =
+  | 'overview'
+  | 'accounts'
+  | 'transactions'
+  | 'cards'
+  | 'invoices'
+  | 'categories'
+  | 'planning'
+  | 'goals'
 
 const PREFIX: Record<Domain, readonly string[]> = {
   overview: queryKeys.overview.all,
@@ -134,6 +217,8 @@ const PREFIX: Record<Domain, readonly string[]> = {
   cards: queryKeys.cards.all,
   invoices: queryKeys.invoices.all,
   categories: queryKeys.categories.all,
+  planning: queryKeys.planning.all,
+  goals: queryKeys.goals.all,
 }
 
 function invalidate(client: QueryClient, domains: Domain[]) {
@@ -155,11 +240,32 @@ export function useIncomeMutation(id?: Id) {
 }
 
 /** Despesa: pode alterar saldo, limite comprometido e a fatura do ciclo. */
-export function useExpenseMutation(id?: Id) {
+export function useExpenseMutation(id?: Id, recurring = false) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: ExpenseInput) =>
-      id ? services.transactions.updateExpense(id, input) : services.transactions.createExpense(input),
+      id
+        ? recurring
+          ? services.transactions.updateRecurringExpense(id, input)
+          : services.transactions.updateExpense(id, input)
+        : services.transactions.createExpense(input),
+    onSuccess: () => invalidate(client, ['transactions', 'accounts', 'overview', 'cards', 'invoices']),
+  })
+}
+
+export function useDeleteEntryMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (entry: {
+      id: Id
+      kind: 'receita' | 'despesa'
+      recurring: boolean
+    }) => {
+      if (entry.recurring) return services.transactions.cancelRecurringExpense(entry.id)
+      return entry.kind === 'receita'
+        ? services.transactions.deleteIncome(entry.id)
+        : services.transactions.deleteExpense(entry.id)
+    },
     onSuccess: () => invalidate(client, ['transactions', 'accounts', 'overview', 'cards', 'invoices']),
   })
 }
@@ -205,5 +311,197 @@ export function useInvoicePaymentMutation() {
   return useMutation({
     mutationFn: (input: InvoicePaymentInput) => services.invoices.registerPayment(input),
     onSuccess: () => invalidate(client, ['invoices', 'accounts', 'transactions', 'cards', 'overview']),
+  })
+}
+
+export function useWishMutation(id?: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: WishInput) =>
+      id ? services.planning.updateWish(id, input) : services.planning.createWish(input),
+    onSuccess: () => invalidate(client, ['planning']),
+  })
+}
+
+export function useArchiveWishMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.planning.archiveWish(id),
+    onSuccess: () => invalidate(client, ['planning']),
+  })
+}
+
+export function usePlannedExpenseMutation(id?: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: PlannedExpenseInput) =>
+      id
+        ? services.planning.updatePlannedExpense(id, input)
+        : services.planning.createPlannedExpense(input),
+    onSuccess: () => invalidate(client, ['planning']),
+  })
+}
+
+export function useCancelPlannedExpenseMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.planning.cancelPlannedExpense(id),
+    onSuccess: () => invalidate(client, ['planning']),
+  })
+}
+
+export function useRealizePlannedExpenseMutation(id: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { purchaseDate: string; actualAmount?: number }) =>
+      services.planning.realizePlannedExpense(id, input),
+    onSuccess: () =>
+      invalidate(client, ['planning', 'transactions', 'accounts', 'overview', 'cards', 'invoices']),
+  })
+}
+
+export function useCommitmentMutation(id?: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: PersonalCommitmentInput) => id
+      ? services.planning.updateCommitment(id, input)
+      : services.planning.createCommitment(input),
+    onSuccess: () => invalidate(client, ['planning', 'overview', 'transactions']),
+  })
+}
+
+export function useCommitmentStatusMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, action }: { id: Id; action: 'pause' | 'resume' | 'cancel' }) => {
+      if (action === 'pause') await services.planning.pauseCommitment(id)
+      else if (action === 'resume') await services.planning.resumeCommitment(id)
+      else await services.planning.cancelCommitment(id)
+    },
+    onSuccess: () => invalidate(client, ['planning', 'overview', 'transactions']),
+  })
+}
+
+export function useRegisterCommitmentPaymentMutation(id: Id, scheduledDate: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { paymentDate: string; actualAmount?: number }) =>
+      services.planning.registerCommitmentPayment(id, scheduledDate, input),
+    onSuccess: () =>
+      invalidate(client, ['planning', 'transactions', 'accounts', 'overview', 'cards', 'invoices']),
+  })
+}
+
+/* ----------------------------------- Metas ---------------------------------- */
+
+export function useGoalCyclesQuery(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.goals.cycles,
+    queryFn: () => services.goals.listCycles(),
+    enabled,
+  })
+}
+
+export function useGoalCycleQuery(id: Id | undefined) {
+  return useQuery({
+    queryKey: queryKeys.goals.cycle(id ?? ''),
+    queryFn: () => services.goals.getCycle(id as Id),
+    enabled: Boolean(id),
+  })
+}
+
+export function useGoalObjectiveQuery(id: Id | undefined) {
+  return useQuery({
+    queryKey: queryKeys.goals.objective(id ?? ''),
+    queryFn: () => services.goals.getObjective(id as Id),
+    enabled: Boolean(id),
+  })
+}
+
+export function useGoalProgressQuery(objectiveId: Id | undefined) {
+  return useQuery({
+    queryKey: queryKeys.goals.progress(objectiveId ?? ''),
+    queryFn: () => services.goals.listProgress(objectiveId as Id),
+    enabled: Boolean(objectiveId),
+  })
+}
+
+export function useGoalCycleMutation(id?: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    // Devolve sempre o id do ciclo para a página abrir o recém-criado.
+    mutationFn: async (input: GoalCycleInput): Promise<Id> => {
+      if (!id) return services.goals.createCycle(input)
+      await services.goals.updateCycle(id, input)
+      return id
+    },
+    onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+export function useCloseGoalCycleMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.goals.closeCycle(id),
+    onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+export function useReopenGoalCycleMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.goals.reopenCycle(id),
+    onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+export function useDeleteGoalCycleMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.goals.deleteCycle(id),
+    onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+export function useGoalObjectiveMutation(cycleId: Id, objectiveId?: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: GoalObjectiveInput) =>
+      objectiveId
+        ? services.goals.updateObjective(objectiveId, input)
+        : services.goals.createObjective(cycleId, input),
+    onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+export function useAbandonGoalObjectiveMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.goals.abandonObjective(id),
+    onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+export function useDeleteGoalObjectiveMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.goals.deleteObjective(id),
+    onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+export function useGoalProgressMutation(objectiveId: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: GoalProgressInput) => services.goals.addProgress(objectiveId, input),
+    onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+export function useDeleteGoalProgressMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.goals.deleteProgress(id),
+    onSuccess: () => invalidate(client, ['goals']),
   })
 }

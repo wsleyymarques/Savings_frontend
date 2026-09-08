@@ -77,4 +77,28 @@ export const queryKeys = {
     selectable: (params: ScopeParams) =>
       ['categorias', 'selecionaveis', params.accountId ?? 'nenhuma'] as const,
   },
+
+  planning: {
+    all: ['planejamento'] as const,
+    wishes: ['planejamento', 'desejos'] as const,
+    wish: (id: Id) => ['planejamento', 'desejo', id] as const,
+    expenses: (params: ScopeParams) =>
+      ['planejamento', 'gastos', params.accountId ?? 'todas'] as const,
+    expense: (id: Id) => ['planejamento', 'gasto', id] as const,
+    commitments: (params: ScopeParams) =>
+      ['planejamento', 'compromissos', params.accountId ?? 'todas'] as const,
+    commitment: (id: Id) => ['planejamento', 'compromisso', id] as const,
+    commitmentOccurrences: (params: ScopeParams & { start: string; end: string }) =>
+      ['planejamento', 'ocorrencias-compromisso', params.accountId ?? 'todas', params.start, params.end] as const,
+    simulation: (params: ScopeParams) =>
+      ['planejamento', 'simulacao', params.accountId ?? 'todas'] as const,
+  },
+
+  goals: {
+    all: ['metas'] as const,
+    cycles: ['metas', 'ciclos'] as const,
+    cycle: (id: Id) => ['metas', 'ciclo', id] as const,
+    objective: (id: Id) => ['metas', 'objetivo', id] as const,
+    progress: (objectiveId: Id) => ['metas', 'progresso', objectiveId] as const,
+  },
 } as const

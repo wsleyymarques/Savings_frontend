@@ -1,9 +1,11 @@
 import type { CivilDate } from '../lib/date'
 import type { Cents } from '../lib/money'
 import type { CardFunction, CategoryOrigin, ExpenseMode, Id, PaymentMethod, User } from '../data/types'
+import type { GoalDirection, GoalMetricType } from '../lib/goals'
 import type { CycleStatus, EntryKind, PaymentStatus } from '../data/selectors'
 
 export type { User }
+export type { GoalDirection, GoalMetricType }
 
 /* --------------------------- Parâmetros de leitura -------------------------- */
 
@@ -116,6 +118,13 @@ export interface EntryRow {
   method: PaymentMethod | null
   amount: Cents
   editable: boolean
+  /** Cobrança recorrente calculada para o período, ainda não faturada. */
+  projected: boolean
+  /** Regra de origem quando a linha representa uma previsão recorrente. */
+  recurringRuleId: Id | null
+  /** Compromisso pessoal de origem quando a linha é uma previsão de pagamento. */
+  personalCommitmentId: Id | null
+  beneficiaryName: string | null
   expenseMode?: ExpenseMode
   installmentNumber?: number | null
   installmentCount?: number | null
@@ -144,6 +153,8 @@ export interface OverviewSummary {
   period: {
     income: Cents
     expense: Cents
+    realizedExpense: Cents
+    projectedExpense: Cents
     result: Cents
   }
   filteredExpenseTotal: Cents
@@ -253,6 +264,241 @@ export interface InvoicePaymentInput {
   date: CivilDate
 }
 
+export type WishPriority = 'baixa' | 'media' | 'alta'
+export type WishStatus = 'desejado' | 'planejado' | 'comprado' | 'arquivado'
+export type PlannedExpenseStatus = 'planejado' | 'realizado' | 'cancelado'
+
+export interface WishItem {
+  id: Id
+  description: string
+  estimatedAmount: Cents
+  desiredDate: CivilDate | null
+  priority: WishPriority
+  productUrl: string | null
+  notes: string | null
+  status: WishStatus
+}
+
+export interface WishInput {
+  description: string
+  estimatedAmount: Cents
+  desiredDate: CivilDate | null
+  priority: WishPriority
+  productUrl: string | null
+  notes: string | null
+}
+
+export interface PlannedExpense {
+  id: Id
+  wishItemId: Id | null
+  accountId: Id
+  accountName: string
+  cardId: Id | null
+  cardName: string | null
+  categoryId: Id
+  categoryName: string
+  description: string
+  amount: Cents
+  plannedDate: CivilDate
+  method: PaymentMethod
+  expenseMode: 'unica' | 'parcelada'
+  installmentCount: number | null
+  includedInSimulation: boolean
+  status: PlannedExpenseStatus
+  actualPurchaseDate: CivilDate | null
+  realizedTransactionId: Id | null
+}
+
+export interface PlannedExpenseInput {
+  wishItemId: Id | null
+  accountId: Id | null
+  cardId: Id | null
+  categoryId: Id | null
+  description: string
+  amount: Cents
+  plannedDate: CivilDate
+  method: PaymentMethod
+  expenseMode: 'unica' | 'parcelada'
+  installmentCount: number | null
+  includedInSimulation: boolean
+}
+
+export type PersonalCommitmentSchedule = 'parcelado' | 'recorrente'
+export type PersonalCommitmentStatus = 'ativo' | 'pausado' | 'concluido' | 'cancelado'
+export type CommitmentOccurrenceStatus = 'pago' | 'atrasado' | 'previsto'
+
+export interface PersonalCommitment {
+  id: Id
+  beneficiaryName: string
+  description: string
+  amount: Cents
+  accountId: Id
+  accountName: string
+  cardId: Id | null
+  cardName: string | null
+  categoryId: Id
+  categoryName: string
+  method: PaymentMethod
+  schedule: PersonalCommitmentSchedule
+  startDate: CivilDate
+  installmentCount: number | null
+  endDate: CivilDate | null
+  includedInSimulation: boolean
+  status: PersonalCommitmentStatus
+  paidOccurrences: number
+}
+
+export interface PersonalCommitmentInput {
+  beneficiaryName: string
+  description: string
+  amount: Cents
+  accountId: Id | null
+  cardId: Id | null
+  categoryId: Id | null
+  method: PaymentMethod
+  schedule: PersonalCommitmentSchedule
+  startDate: CivilDate
+  installmentCount: number | null
+  endDate: CivilDate | null
+  includedInSimulation: boolean
+}
+
+export interface CommitmentOccurrence {
+  id: string
+  commitmentId: Id
+  beneficiaryName: string
+  description: string
+  scheduledDate: CivilDate
+  amount: Cents
+  installmentNumber: number | null
+  installmentCount: number | null
+  status: CommitmentOccurrenceStatus
+  paymentDate: CivilDate | null
+  transactionId: Id | null
+  includedInSimulation: boolean
+}
+
+export interface PlanningSimulation {
+  selectedCount: number
+  totalPlanned: Cents
+  currentBalance: Cents
+  balanceAfterPurchases: Cents
+  balanceAfterAllPayments: Cents
+  accounts: Array<{
+    id: Id
+    name: string
+    currentBalance: Cents
+    immediateOutflow: Cents
+    futureCardPayments: Cents
+    balanceAfterPurchases: Cents
+    balanceAfterAllPayments: Cents
+  }>
+  cards: Array<{
+    id: Id
+    name: string
+    currentAvailable: Cents | null
+    plannedCommitment: Cents
+    projectedAvailable: Cents | null
+  }>
+  timeline: Array<{
+    plannedExpenseId: Id
+    description: string
+    date: CivilDate
+    amount: Cents
+    kind: 'compra' | 'pagamento-cartao'
+    installmentNumber: number | null
+    installmentCount: number | null
+  }>
+  warnings: string[]
+}
+
+/* ----------------------------------- Metas ---------------------------------- */
+
+export type GoalCycleStatus = 'planejado' | 'ativo' | 'encerrado'
+export type GoalObjectiveStatus = 'ativo' | 'alcancado' | 'abandonado'
+
+export interface GoalCycleSummary {
+  id: Id
+  name: string
+  startDate: CivilDate
+  endDate: CivilDate
+  /** Percentual aceito de distância do alvo, declarado antes do resultado. */
+  expectedErrorMargin: number
+  status: GoalCycleStatus
+  note: string | null
+  realErrorMargin: number
+  projectedErrorMargin: number
+  /** Positivo quando o ciclo está pior que o esperado. */
+  deviation: number
+  withinMargin: boolean
+  elapsedFraction: number
+  objectiveCount: number
+}
+
+export interface GoalObjectiveRow {
+  id: Id
+  title: string
+  description: string | null
+  metricType: GoalMetricType
+  direction: GoalDirection
+  baselineValue: number
+  targetValue: number
+  currentValue: number
+  unit: string | null
+  weight: number
+  expectedErrorMargin: number
+  /** De 0 a 1; superar o alvo não credita acima de 100%. */
+  attainment: number
+  errorPercent: number
+  withinMargin: boolean
+  status: GoalObjectiveStatus
+}
+
+export interface GoalCycleDetail extends GoalCycleSummary {
+  objectives: GoalObjectiveRow[]
+}
+
+export interface GoalCycleInput {
+  name: string
+  startDate: CivilDate
+  endDate: CivilDate
+  expectedErrorMargin: number
+  note: string | null
+}
+
+export interface GoalObjectiveInput {
+  title: string
+  description: string | null
+  metricType: GoalMetricType
+  direction: GoalDirection
+  baselineValue: number
+  targetValue: number
+  unit: string | null
+  weight: number
+  expectedErrorMargin: number | null
+}
+
+export interface GoalObjectiveRecord extends GoalObjectiveInput {
+  id: Id
+  cycleId: Id
+  currentValue: number
+  status: GoalObjectiveStatus
+  /** Janela do ciclo: o registro de progresso só aceita datas dentro dela. */
+  cycleStartDate: CivilDate
+  cycleEndDate: CivilDate
+  cycleStatus: GoalCycleStatus
+}
+
+export interface GoalProgressInput {
+  occurredOn: CivilDate
+  value: number
+  note: string | null
+}
+
+export interface GoalProgressEntry extends GoalProgressInput {
+  id: Id
+}
+
 /* ------------------------------ Services por domínio ------------------------ */
 
 export interface AuthService {
@@ -283,8 +529,13 @@ export interface TransactionsService {
   getExpense(id: Id): Promise<ExpenseInput>
   createIncome(input: IncomeInput): Promise<void>
   updateIncome(id: Id, input: IncomeInput): Promise<void>
+  deleteIncome(id: Id): Promise<void>
   createExpense(input: ExpenseInput): Promise<void>
   updateExpense(id: Id, input: ExpenseInput): Promise<void>
+  deleteExpense(id: Id): Promise<void>
+  getRecurringExpense(id: Id): Promise<ExpenseInput>
+  updateRecurringExpense(id: Id, input: ExpenseInput): Promise<void>
+  cancelRecurringExpense(id: Id): Promise<void>
 }
 
 export interface CardsService {
@@ -309,6 +560,54 @@ export interface CategoriesService {
   archive(id: Id): Promise<void>
 }
 
+export interface PlanningService {
+  listWishes(): Promise<WishItem[]>
+  getWish(id: Id): Promise<WishItem>
+  createWish(input: WishInput): Promise<WishItem>
+  updateWish(id: Id, input: WishInput): Promise<WishItem>
+  archiveWish(id: Id): Promise<void>
+  listPlannedExpenses(params: ScopeParams): Promise<PlannedExpense[]>
+  getPlannedExpense(id: Id): Promise<PlannedExpense>
+  createPlannedExpense(input: PlannedExpenseInput): Promise<PlannedExpense>
+  updatePlannedExpense(id: Id, input: PlannedExpenseInput): Promise<PlannedExpense>
+  cancelPlannedExpense(id: Id): Promise<void>
+  realizePlannedExpense(id: Id, input: { purchaseDate: CivilDate; actualAmount?: Cents }): Promise<PlannedExpense>
+  listCommitments(params: ScopeParams): Promise<PersonalCommitment[]>
+  getCommitment(id: Id): Promise<PersonalCommitment>
+  createCommitment(input: PersonalCommitmentInput): Promise<PersonalCommitment>
+  updateCommitment(id: Id, input: PersonalCommitmentInput): Promise<PersonalCommitment>
+  pauseCommitment(id: Id): Promise<PersonalCommitment>
+  resumeCommitment(id: Id): Promise<PersonalCommitment>
+  cancelCommitment(id: Id): Promise<void>
+  listCommitmentOccurrences(
+    params: ScopeParams & { start: CivilDate; end: CivilDate },
+  ): Promise<CommitmentOccurrence[]>
+  registerCommitmentPayment(
+    id: Id,
+    scheduledDate: CivilDate,
+    input: { paymentDate: CivilDate; actualAmount?: Cents },
+  ): Promise<void>
+  simulate(params: ScopeParams): Promise<PlanningSimulation>
+}
+
+export interface GoalsService {
+  listCycles(): Promise<GoalCycleSummary[]>
+  getCycle(id: Id): Promise<GoalCycleDetail>
+  createCycle(input: GoalCycleInput): Promise<Id>
+  updateCycle(id: Id, input: GoalCycleInput): Promise<void>
+  closeCycle(id: Id): Promise<void>
+  reopenCycle(id: Id): Promise<void>
+  deleteCycle(id: Id): Promise<void>
+  getObjective(id: Id): Promise<GoalObjectiveRecord>
+  createObjective(cycleId: Id, input: GoalObjectiveInput): Promise<void>
+  updateObjective(id: Id, input: GoalObjectiveInput): Promise<void>
+  abandonObjective(id: Id): Promise<void>
+  deleteObjective(id: Id): Promise<void>
+  listProgress(objectiveId: Id): Promise<GoalProgressEntry[]>
+  addProgress(objectiveId: Id, input: GoalProgressInput): Promise<void>
+  deleteProgress(id: Id): Promise<void>
+}
+
 export interface Services {
   auth: AuthService
   overview: OverviewService
@@ -317,4 +616,6 @@ export interface Services {
   cards: CardsService
   invoices: InvoicesService
   categories: CategoriesService
+  planning: PlanningService
+  goals: GoalsService
 }

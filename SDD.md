@@ -228,14 +228,14 @@ O relatório mensal deve decidir explicitamente se reconhece o valor total na da
 
 1. Uma regra de recorrência guarda descrição, valor, categoria, forma de pagamento, conta ou cartão, data inicial, frequência, término opcional e estado ativo ou pausado.
 2. A primeira entrega aceita frequência mensal. Frequências semanal e anual podem ser adicionadas depois sem alterar o conceito.
-3. A regra não aparece como despesa nos totais. Somente cada ocorrência concreta aparece nos lançamentos, faturas e relatórios.
+3. A regra não aparece diretamente como despesa. Ocorrências concretas e projeções futuras aparecem nos lançamentos e na previsão do período, sempre diferenciadas; somente ocorrências concretas entram em faturas e comprometem limite.
 4. O sistema gera cada ocorrência no dia correspondente e mantém uma chave única formada pela regra e pela data prevista, evitando duplicidade em reinícios ou novas tentativas.
 5. Alterar ou pausar uma regra afeta apenas ocorrências futuras. Ocorrências já geradas preservam o histórico.
 6. Em meses que não possuem o dia configurado, a ocorrência cai no último dia do mês.
 7. Se o cartão não tiver limite disponível, a ocorrência não é lançada silenciosamente: ela fica marcada como pendente de ação e a regra continua rastreável.
 8. Para recorrência automática no primeiro incremento, priorizar compras no cartão de crédito, como assinaturas. Pix, boleto e débito exigem um conceito adicional de despesa prevista e confirmação de pagamento para não reduzir o saldo sem evidência de que o pagamento ocorreu.
 9. A geração deve ocorrer por rotina diária no backend e também recuperar ocorrências vencidas após indisponibilidade, mantendo a operação idempotente.
-10. Cada ocorrência recorrente gerada no crédito entra na fatura correspondente e compromete o limite pelo seu valor. Ocorrências futuras ainda não geradas aparecem apenas como projeção e não reduzem o limite disponível, pois uma recorrência sem término não possui valor total conhecido.
+10. Cada ocorrência recorrente gerada no crédito entra na fatura correspondente e compromete o limite pelo seu valor. Ocorrências futuras ainda não geradas aparecem como projeção nos lançamentos e compõem o gasto previsto do período, mas não reduzem o limite disponível, pois uma recorrência sem término não possui valor total conhecido.
 
 #### Cálculo do limite de crédito
 
@@ -265,6 +265,32 @@ A listagem mantém filtros independentes para que conceitos diferentes possam se
 - Conta, cartão, categoria e período continuam disponíveis conforme o escopo atual.
 
 Exemplos de combinações: `Despesas + Parceladas + Crédito`, `Despesas + Recorrentes + Ativas` e `Parceladas + cartão específico`. Cada parcela aparece na listagem do período com identificação como `3/10`; a interface também permite abrir o conjunto da compra. Cada ocorrência recorrente indica a regra que a originou.
+
+#### Lista de desejos e gastos planejados
+
+1. Um desejo registra produto, valor estimado, prioridade, data desejada, link e observações, mas nunca altera saldo, limite, fatura ou os totais da visão geral.
+2. Um desejo pode originar um gasto planejado. O vínculo é preservado para que sua situação passe de desejado para planejado e, depois, comprado.
+3. Um gasto planejado contém antecipadamente descrição, valor, categoria, conta ou cartão, forma de pagamento, data prevista e parcelamento opcional.
+4. O cenário planejado mostra saldo atual, total planejado, saldo após pagamentos imediatos, saldo após futuras quitações de cartão e limite projetado por cartão.
+5. Gastos planejados aparecem somente na área Planejamento. Eles não entram na tabela de lançamentos nem nos indicadores realizados.
+6. A ação `Registrar compra` solicita a data efetiva e cria uma despesa real usando os demais dados do planejamento.
+7. A criação da despesa, das parcelas e faturas aplicáveis e a marcação do planejamento como realizado ocorrem na mesma transação de banco.
+8. Um gasto realizado não pode ser realizado novamente. O planejamento e seu vínculo com o lançamento são preservados como histórico.
+9. Cancelar um gasto planejado não exclui o desejo de origem; ele volta a ficar disponível como desejado.
+10. Para crédito, a simulação compromete o valor total planejado no limite e distribui o impacto futuro pelas datas de vencimento das faturas, sem criar faturas reais.
+
+#### Compromissos pessoais
+
+1. Um compromisso pessoal representa pagamentos combinados com um beneficiário e pode ser parcelado ou recorrente mensal.
+2. O valor informado corresponde a cada pagamento. Um compromisso parcelado também informa a quantidade total; um recorrente pode ter data final ou continuar até ser pausado ou cancelado.
+3. Cada ocorrência futura aparece em Planejamento, Lançamentos e nos gastos previstos da Visão geral, sem alterar saldo, limite ou fatura.
+4. A ocorrência vencida e ainda não paga fica identificada como atrasada.
+5. `Registrar pagamento` solicita somente a data efetiva e cria uma despesa usando valor, categoria, conta ou cartão e forma de pagamento do compromisso.
+6. Criar a despesa e vincular o pagamento à ocorrência é uma operação atômica e idempotente; a mesma ocorrência não pode ser paga duas vezes.
+7. Depois de pago, o valor deixa de ser previsão e passa a integrar somente os gastos realizados, evitando dupla contabilização.
+8. A última parcela conclui automaticamente o compromisso parcelado. Um compromisso recorrente permanece ativo até sua data final, pausa ou cancelamento.
+9. Pausar suspende as previsões ainda não pagas; retomar reativa o calendário. Cancelar preserva pagamentos anteriores e impede novos.
+10. Após o primeiro pagamento, modalidade, data inicial e quantidade de parcelas são preservadas para não invalidar o histórico; os demais dados continuam editáveis para ocorrências futuras.
 
 ### 4.8 Categorias de despesas
 
@@ -404,13 +430,14 @@ Se a fatura de R$ 300 do cartão A for integralmente paga usando a conta B, o sa
 1. **Acesso:** cadastrar nome, e-mail e senha, entrar, sair e trocar de usuário; sem verificação por código e com dados isolados por usuário.
 2. **Configuração inicial:** cadastrar a conta e informar o saldo inicial.
 3. **Visão geral:** consultar os indicadores consolidados da seção 5.4, selecionar período e contas e consultar detalhamentos dos gastos.
-4. **Lançamentos:** cadastrar e consultar receitas e despesas; para gastos, selecionar Pix, boleto, débito ou crédito, informar conta ou cartão e escolher uma categoria disponível naquela conta.
+4. **Lançamentos:** cadastrar, consultar, editar e excluir receitas e despesas elegíveis; para gastos, selecionar Pix, boleto, débito ou crédito, informar conta ou cartão e escolher uma categoria disponível naquela conta.
 5. **Cartões:** cadastrar e consultar cartões, personalização, funções, limites e datas aplicáveis.
 6. **Faturas:** consultar compras por ciclo e registrar o pagamento pela conta escolhida.
 7. **Categorias:** visualizar as categorias genéricas e cadastrar, renomear ou arquivar categorias personalizadas da conta selecionada. Permitir criar uma categoria durante o lançamento, preservando os campos já preenchidos e selecionando a nova categoria após salvar.
-8. **Meu perfil:** consultar nome e e-mail; na proposta de interface, editar nome e alterar senha mediante senha atual.
+8. **Planejamento:** manter desejos, simular gastos, acompanhar compromissos pessoais e transformar compras ou pagamentos previstos em despesas reais informando a data efetiva.
+9. **Meu perfil:** consultar nome e e-mail; na proposta de interface, editar nome e alterar senha mediante senha atual.
 
-A edição, exclusão e correção de registros financeiros precisam de regras específicas, especialmente quando a fatura já estiver paga. O protótipo prioriza cadastro, consulta e quitação; não deve inventar ações de exclusão financeira antes dessas regras.
+Receitas e despesas avulsas podem ser editadas ou excluídas. Despesas vinculadas a fatura paga são preservadas; séries parceladas e recorrentes seguem as regras específicas da seção 4.7.
 
 ### 7.1 Navegação proposta para o protótipo
 
@@ -418,10 +445,11 @@ Sidebar no desktop, menu lateral recolhível no celular, com a mesma ordem:
 
 1. Visão geral.
 2. Lançamentos.
-3. Contas.
-4. Cartões.
-5. Faturas.
-6. Categorias.
+3. Planejamento.
+4. Contas.
+5. Cartões.
+6. Faturas.
+7. Categorias.
 
 No topo da sidebar, abaixo da marca, fica o seletor global de conta financeira com saldo, conforme a captura fornecida pelo usuário. Ele oferece Todas as contas e contas individuais e governa o escopo das seis páginas. Período e filtros locais ficam no conteúdo, sem duplicar o seletor de conta. No rodapé, avatar com iniciais, nome do usuário e menu Meu perfil / Trocar usuário / Sair, separado do seletor financeiro. Receitas e despesas são abas de Lançamentos; relatórios básicos ficam na Visão geral, sem telas redundantes. Medidas, estados e comportamento responsivo estão em [design.md](./design.md).
 
@@ -513,7 +541,7 @@ Comportamento proposto do painel:
 | Imagens | Em aberto | Escolher entre upload, imagens predefinidas ou outra origem. |
 | Hospedagem | Em aberto | Nenhuma definição até o momento. |
 
-Os contratos implementados, comandos e variáveis estão em [backend/README.md](./backend/README.md). Regras que continuam em aberto — como pagamento parcial, juros, estorno e edição/exclusão financeira — não receberam endpoints definitivos.
+Os contratos implementados, comandos e variáveis estão em [backend/README.md](./backend/README.md). Pagamento parcial, juros, estorno e correção de parcelas já faturadas continuam em aberto.
 
 ## 10. Itens ainda não incluídos no escopo confirmado
 

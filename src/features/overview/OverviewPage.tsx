@@ -183,18 +183,24 @@ export function OverviewPage() {
               <section className="overview-section">
                 <SectionHeading
                   icon="calendar"
-                  title={`Desempenho no período · ${period.label}`}
-                  description="Receitas e gastos reconhecidos pelas datas dos lançamentos"
+                  title={`Previsão do período · ${period.label}`}
+                  description="Receitas, gastos realizados e cobranças recorrentes previstas"
                   aside={<span className="overview-live-note">Dados do período selecionado</span>}
                 />
                 <div className="overview-metrics overview-metrics--performance">
                   <MetricCard label="Total de receitas" value={data.period.income} icon="wallet" caption="Entradas recebidas no período" tone="positive" />
-                  <MetricCard label="Total de gastos" value={data.period.expense} icon="faturas" caption="Despesas realizadas no período" tone="negative" />
                   <MetricCard
-                    label="Resultado do período"
+                    label="Gastos do período"
+                    value={data.period.expense}
+                    icon="faturas"
+                    caption={<>Realizados: <Money value={data.period.realizedExpense} /> · Previstos: <Money value={data.period.projectedExpense} /></>}
+                    tone="negative"
+                  />
+                  <MetricCard
+                    label="Resultado previsto"
                     value={data.period.result}
                     icon="trending"
-                    caption="Receitas menos gastos"
+                    caption="Receitas menos gastos realizados e previstos"
                     tone={data.period.result < 0 ? 'negative' : 'positive'}
                     signed
                   />
@@ -206,7 +212,7 @@ export function OverviewPage() {
                   <div className="overview-panel__header">
                     <div>
                       <h2 className="overview-panel__title">Gastos por categoria</h2>
-                      <p className="overview-panel__description">Distribuição das despesas do período</p>
+                      <p className="overview-panel__description">Distribuição dos gastos realizados e previstos</p>
                     </div>
                     <strong className="overview-panel__total"><Money value={data.filteredExpenseTotal} /></strong>
                   </div>
@@ -226,7 +232,7 @@ export function OverviewPage() {
                   <div className="overview-panel__header">
                     <div>
                       <h2 className="overview-panel__title">Forma de pagamento</h2>
-                      <p className="overview-panel__description">Valores liquidados por método</p>
+                      <p className="overview-panel__description">Valores realizados e previstos por método</p>
                     </div>
                     <Icon name="filter" size={18} aria-hidden="true" />
                   </div>
@@ -303,8 +309,8 @@ export function OverviewPage() {
               <section className="overview-panel overview-panel--table">
                 <div className="overview-panel__header">
                   <div>
-                    <h2 className="overview-panel__title">Últimos lançamentos</h2>
-                    <p className="overview-panel__description">Movimentações registradas recentemente</p>
+                    <h2 className="overview-panel__title">Lançamentos do período</h2>
+                    <p className="overview-panel__description">Movimentações realizadas e recorrências previstas</p>
                   </div>
                   <Link className="overview-panel__link" to="/lancamentos">Ver todos os lançamentos <Icon name="chevron-right" size={15} /></Link>
                 </div>
@@ -323,12 +329,15 @@ export function OverviewPage() {
                         {data.latestEntries.map((row) => (
                           <tr key={row.id}>
                             <td className="tabular">{formatDate(row.date)}</td>
-                            <td><strong>{row.description}</strong></td>
+                            <td>
+                              <strong>{row.description}</strong>
+                              {row.projected ? <span className="caption text-muted"> · Prevista</span> : null}
+                            </td>
                             <td>{row.categoryLabel ?? '—'}</td>
                             <td>{row.cardName ?? row.accountName}</td>
                             <td>
-                              <Badge tone={row.kind === 'receita' ? 'success' : row.kind === 'pagamento' ? 'info' : 'neutral'}>
-                                {row.kind === 'receita' ? 'Receita' : row.kind === 'pagamento' ? 'Pagamento' : row.method ? PAYMENT_METHOD_SHORT[row.method] : 'Despesa'}
+                              <Badge tone={row.kind === 'receita' ? 'success' : row.projected || row.kind === 'pagamento' ? 'info' : 'neutral'}>
+                                {row.projected ? 'Prevista' : row.kind === 'receita' ? 'Receita' : row.kind === 'pagamento' ? 'Pagamento' : row.method ? PAYMENT_METHOD_SHORT[row.method] : 'Despesa'}
                               </Badge>
                             </td>
                             <td className="cell-money"><Money value={row.amount} signed /></td>

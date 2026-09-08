@@ -1,5 +1,4 @@
 import { createHttpClient, type HttpClient } from '../httpClient'
-import { DataError } from '../errors'
 import { tokenStore } from './tokenStore'
 import type {
   ApiAccount,
@@ -8,13 +7,24 @@ import type {
   ApiCategory,
   ApiInvoice,
   ApiOverview,
+  ApiPlannedExpense,
+  ApiPlanningSimulation,
+  ApiPersonalCommitment,
+  ApiCommitmentOccurrence,
+  ApiRecurringExpenseRule,
   ApiTransaction,
   ApiUser,
+  ApiWishItem,
+  ApiGoalCycleResult,
+  ApiGoalCycleRow,
+  ApiGoalObjective,
+  ApiGoalProgressEntry,
 } from './apiTypes'
 import {
   centsToDecimal,
   decimalToCents,
   functionToApi,
+  methodFromApi,
   methodToApi,
   modeToApi,
   toAccountSummary,
@@ -28,6 +38,10 @@ import type {
   AccountDetail,
   AccountSummary,
   CardDetail,
+  GoalCycleDetail,
+  GoalCycleInput,
+  GoalCycleSummary,
+  GoalObjectiveInput,
   InvoiceDetail,
   OverviewSummary,
   ScopeParams,
@@ -59,15 +73,16 @@ export const ENDPOINTS = {
   recurringExpenses: '/transactions/expenses/recurring',
   invoices: '/invoices',
   overview: '/overview',
+  wishes: '/planning/wishes',
+  plannedExpenses: '/planning/planned-expenses',
+  commitments: '/planning/commitments',
+  commitmentOccurrences: '/planning/commitment-occurrences',
+  planningSimulation: '/planning/simulation',
+  goalCycles: '/goals/cycles',
+  goalObjectives: '/goals/objectives',
+  goalProgress: '/goals/progress',
   health: '/health',
 } as const
-
-/** Edição de lançamento ainda não existe na API (regras abertas no SDD). */
-function notSupported(): never {
-  throw new DataError(
-    'A correção de lançamentos ainda não está disponível: as regras continuam pendentes no SDD.',
-  )
-}
 
 export function createHttpServices(baseUrl: string): Services {
   const http: HttpClient = createHttpClient(baseUrl, tokenStore)
@@ -143,7 +158,11 @@ export function createHttpServices(baseUrl: string): Services {
           accountsInScope(params),
           http.get<ApiCard[]>(ENDPOINTS.cards, { accountId: params.accountId ?? undefined }),
           listTransactions(expenseQuery),
-          listTransactions({ accountId: params.accountId ?? undefined }),
+          listTransactions({
+            accountId: params.accountId ?? undefined,
+            from: params.start,
+            to: params.end,
+          }),
         ])
 
         const accountSummaries = accounts
@@ -177,6 +196,10 @@ export function createHttpServices(baseUrl: string): Services {
           period: {
             income: decimalToCents(overview.period.incomes),
             expense: decimalToCents(overview.period.expenses),
+            realizedExpense: decimalToCents(
+              overview.period.realizedExpenses ?? overview.period.expenses,
+            ),
+            projectedExpense: decimalToCents(overview.period.projectedExpenses),
             result: decimalToCents(overview.period.result),
           },
           filteredExpenseTotal: [...categoryTotals.values()].reduce((total, row) => total + row.amount, 0),
@@ -264,8 +287,30 @@ export function createHttpServices(baseUrl: string): Services {
         const items = await listTransactions({ accountId: params.accountId ?? undefined })
         return items.length
       },
-      getIncome: notSupported,
-      getExpense: notSupported,
+      async getIncome(id) {
+        const item = await http.get<ApiTransaction>(`${ENDPOINTS.incomes}/${id}`)
+        return {
+          description: item.description,
+          amount: decimalToCents(item.amount),
+          accountId: item.accountId,
+          date: item.effectiveDate,
+        }
+      },
+      async getExpense(id) {
+        const item = await http.get<ApiTransaction>(`${ENDPOINTS.expenses}/${id}`)
+        return {
+          description: item.description,
+          amount: decimalToCents(item.amount),
+          date: item.effectiveDate,
+          method: methodFromApi(item.paymentMethod) ?? 'pix',
+          accountId: item.accountId,
+          cardId: item.cardId,
+          categoryId: item.categoryId,
+          expenseMode: 'unica',
+          installmentCount: item.installmentCount ?? undefined,
+          recurrenceEndDate: null,
+        }
+      },
       async createIncome(input) {
         await http.post<ApiTransaction>(ENDPOINTS.incomes, {
           accountId: input.accountId,
@@ -274,7 +319,17 @@ export function createHttpServices(baseUrl: string): Services {
           effectiveDate: input.date,
         })
       },
-      updateIncome: notSupported,
+      async updateIncome(id, input) {
+        await http.patch<ApiTransaction>(`${ENDPOINTS.incomes}/${id}`, {
+          accountId: input.accountId,
+          description: input.description,
+          amount: centsToDecimal(input.amount),
+          effectiveDate: input.date,
+        })
+      },
+      async deleteIncome(id) {
+        await http.delete<void>(`${ENDPOINTS.incomes}/${id}`)
+      },
       async createExpense(input) {
         if (input.expenseMode === 'parcelada') {
           await http.post<ApiTransaction[]>(ENDPOINTS.installmentExpenses, {
@@ -308,7 +363,47 @@ export function createHttpServices(baseUrl: string): Services {
           paymentMethod: methodToApi(input.method),
         })
       },
-      updateExpense: notSupported,
+      async updateExpense(id, input) {
+        await http.patch<ApiTransaction>(`${ENDPOINTS.expenses}/${id}`, {
+          accountId: input.accountId ?? undefined,
+          cardId: input.cardId ?? undefined,
+          categoryId: input.categoryId,
+          description: input.description,
+          amount: centsToDecimal(input.amount),
+          effectiveDate: input.date,
+          paymentMethod: methodToApi(input.method),
+        })
+      },
+      async deleteExpense(id) {
+        await http.delete<void>(`${ENDPOINTS.expenses}/${id}`)
+      },
+      async getRecurringExpense(id) {
+        const rule = await http.get<ApiRecurringExpenseRule>(`${ENDPOINTS.recurringExpenses}/${id}`)
+        return {
+          description: rule.description,
+          amount: decimalToCents(rule.amount),
+          date: rule.nextOccurrenceDate,
+          method: 'credito',
+          accountId: null,
+          cardId: rule.cardId,
+          categoryId: rule.categoryId,
+          expenseMode: 'recorrente',
+          recurrenceEndDate: rule.endDate,
+        }
+      },
+      async updateRecurringExpense(id, input) {
+        await http.patch<ApiRecurringExpenseRule>(`${ENDPOINTS.recurringExpenses}/${id}`, {
+          cardId: input.cardId,
+          categoryId: input.categoryId,
+          description: input.description,
+          amount: centsToDecimal(input.amount),
+          startDate: input.date,
+          endDate: input.recurrenceEndDate ?? undefined,
+        })
+      },
+      async cancelRecurringExpense(id) {
+        await http.delete<void>(`${ENDPOINTS.recurringExpenses}/${id}`)
+      },
     },
 
     cards: {
@@ -441,6 +536,344 @@ export function createHttpServices(baseUrl: string): Services {
         await http.delete<void>(`${ENDPOINTS.categories}/${id}`)
       },
     },
+
+    planning: {
+      async listWishes() {
+        return (await http.get<ApiWishItem[]>(ENDPOINTS.wishes)).map(toWishItem)
+      },
+      async getWish(id) {
+        return toWishItem(await http.get<ApiWishItem>(`${ENDPOINTS.wishes}/${id}`))
+      },
+      async createWish(input) {
+        return toWishItem(await http.post<ApiWishItem>(ENDPOINTS.wishes, wishPayload(input)))
+      },
+      async updateWish(id, input) {
+        return toWishItem(
+          await http.patch<ApiWishItem>(`${ENDPOINTS.wishes}/${id}`, wishPayload(input)),
+        )
+      },
+      async archiveWish(id) {
+        await http.delete<void>(`${ENDPOINTS.wishes}/${id}`)
+      },
+      async listPlannedExpenses(params) {
+        const rows = await http.get<ApiPlannedExpense[]>(ENDPOINTS.plannedExpenses, {
+          accountId: params.accountId ?? undefined,
+        })
+        return rows.map(toPlannedExpense)
+      },
+      async getPlannedExpense(id) {
+        return toPlannedExpense(
+          await http.get<ApiPlannedExpense>(`${ENDPOINTS.plannedExpenses}/${id}`),
+        )
+      },
+      async createPlannedExpense(input) {
+        return toPlannedExpense(
+          await http.post<ApiPlannedExpense>(ENDPOINTS.plannedExpenses, plannedExpensePayload(input)),
+        )
+      },
+      async updatePlannedExpense(id, input) {
+        return toPlannedExpense(
+          await http.patch<ApiPlannedExpense>(
+            `${ENDPOINTS.plannedExpenses}/${id}`,
+            plannedExpensePayload(input),
+          ),
+        )
+      },
+      async cancelPlannedExpense(id) {
+        await http.delete<void>(`${ENDPOINTS.plannedExpenses}/${id}`)
+      },
+      async realizePlannedExpense(id, input) {
+        return toPlannedExpense(
+          await http.post<ApiPlannedExpense>(`${ENDPOINTS.plannedExpenses}/${id}/realize`, {
+            purchaseDate: input.purchaseDate,
+            actualAmount:
+              input.actualAmount === undefined ? undefined : centsToDecimal(input.actualAmount),
+          }),
+        )
+      },
+      async listCommitments(params) {
+        const rows = await http.get<ApiPersonalCommitment[]>(ENDPOINTS.commitments, {
+          accountId: params.accountId ?? undefined,
+        })
+        return rows.map(toPersonalCommitment)
+      },
+      async getCommitment(id) {
+        return toPersonalCommitment(
+          await http.get<ApiPersonalCommitment>(`${ENDPOINTS.commitments}/${id}`),
+        )
+      },
+      async createCommitment(input) {
+        return toPersonalCommitment(
+          await http.post<ApiPersonalCommitment>(ENDPOINTS.commitments, commitmentPayload(input)),
+        )
+      },
+      async updateCommitment(id, input) {
+        return toPersonalCommitment(
+          await http.patch<ApiPersonalCommitment>(
+            `${ENDPOINTS.commitments}/${id}`,
+            commitmentPayload(input),
+          ),
+        )
+      },
+      async pauseCommitment(id) {
+        return toPersonalCommitment(
+          await http.post<ApiPersonalCommitment>(`${ENDPOINTS.commitments}/${id}/pause`, {}),
+        )
+      },
+      async resumeCommitment(id) {
+        return toPersonalCommitment(
+          await http.post<ApiPersonalCommitment>(`${ENDPOINTS.commitments}/${id}/resume`, {}),
+        )
+      },
+      async cancelCommitment(id) {
+        await http.delete<void>(`${ENDPOINTS.commitments}/${id}`)
+      },
+      async listCommitmentOccurrences(params) {
+        const rows = await http.get<ApiCommitmentOccurrence[]>(ENDPOINTS.commitmentOccurrences, {
+          accountId: params.accountId ?? undefined,
+          from: params.start,
+          to: params.end,
+        })
+        return rows.map((item) => ({
+          ...item,
+          amount: decimalToCents(item.amount),
+          status: item.status === 'PAID'
+            ? 'pago' as const
+            : item.status === 'OVERDUE'
+              ? 'atrasado' as const
+              : 'previsto' as const,
+        }))
+      },
+      async registerCommitmentPayment(id, scheduledDate, input) {
+        await http.post(`${ENDPOINTS.commitments}/${id}/occurrences/${scheduledDate}/pay`, {
+          paymentDate: input.paymentDate,
+          actualAmount: input.actualAmount === undefined ? undefined : centsToDecimal(input.actualAmount),
+        })
+      },
+      async simulate(params) {
+        const simulation = await http.get<ApiPlanningSimulation>(ENDPOINTS.planningSimulation, {
+          accountId: params.accountId ?? undefined,
+        })
+        return {
+          selectedCount: simulation.selectedCount,
+          totalPlanned: decimalToCents(simulation.totalPlanned),
+          currentBalance: decimalToCents(simulation.currentBalance),
+          balanceAfterPurchases: decimalToCents(simulation.balanceAfterPurchases),
+          balanceAfterAllPayments: decimalToCents(simulation.balanceAfterAllPayments),
+          accounts: simulation.accounts.map((account) => ({
+            ...account,
+            currentBalance: decimalToCents(account.currentBalance),
+            immediateOutflow: decimalToCents(account.immediateOutflow),
+            futureCardPayments: decimalToCents(account.futureCardPayments),
+            balanceAfterPurchases: decimalToCents(account.balanceAfterPurchases),
+            balanceAfterAllPayments: decimalToCents(account.balanceAfterAllPayments),
+          })),
+          cards: simulation.cards.map((card) => ({
+            ...card,
+            currentAvailable:
+              card.currentAvailable === null ? null : decimalToCents(card.currentAvailable),
+            plannedCommitment: decimalToCents(card.plannedCommitment),
+            projectedAvailable:
+              card.projectedAvailable === null ? null : decimalToCents(card.projectedAvailable),
+          })),
+          timeline: simulation.timeline.map((item) => ({
+            ...item,
+            amount: decimalToCents(item.amount),
+            kind: item.kind === 'PURCHASE' ? 'compra' as const : 'pagamento-cartao' as const,
+          })),
+          warnings: simulation.warnings,
+        }
+      },
+    },
+
+    goals: {
+      async listCycles() {
+        const rows = await http.get<ApiGoalCycleRow[]>(ENDPOINTS.goalCycles)
+        return rows.map((row) => toCycleSummary(row.cycle, row.summary))
+      },
+      async getCycle(id) {
+        const result = await http.get<ApiGoalCycleResult>(`${ENDPOINTS.goalCycles}/${id}`)
+        return toCycleDetail(result)
+      },
+      async createCycle(input) {
+        const cycle = await http.post<{ id: string }>(ENDPOINTS.goalCycles, cyclePayload(input))
+        return cycle.id
+      },
+      async updateCycle(id, input) {
+        await http.patch<unknown>(`${ENDPOINTS.goalCycles}/${id}`, cyclePayload(input))
+      },
+      async closeCycle(id) {
+        await http.post<unknown>(`${ENDPOINTS.goalCycles}/${id}/close`, {})
+      },
+      async reopenCycle(id) {
+        await http.post<unknown>(`${ENDPOINTS.goalCycles}/${id}/reopen`, {})
+      },
+      async deleteCycle(id) {
+        await http.delete<void>(`${ENDPOINTS.goalCycles}/${id}`)
+      },
+      async getObjective(id) {
+        return toObjectiveRecord(
+          await http.get<ApiGoalObjective>(`${ENDPOINTS.goalObjectives}/${id}`),
+        )
+      },
+      async createObjective(cycleId, input) {
+        await http.post<unknown>(
+          `${ENDPOINTS.goalCycles}/${cycleId}/objectives`,
+          objectivePayload(input),
+        )
+      },
+      async updateObjective(id, input) {
+        await http.patch<unknown>(`${ENDPOINTS.goalObjectives}/${id}`, objectivePayload(input))
+      },
+      async abandonObjective(id) {
+        await http.patch<unknown>(`${ENDPOINTS.goalObjectives}/${id}`, { status: 'ABANDONED' })
+      },
+      async deleteObjective(id) {
+        await http.delete<void>(`${ENDPOINTS.goalObjectives}/${id}`)
+      },
+      async listProgress(objectiveId) {
+        const rows = await http.get<ApiGoalProgressEntry[]>(
+          `${ENDPOINTS.goalObjectives}/${objectiveId}/progress`,
+        )
+        return rows.map((row) => ({
+          id: row.id,
+          occurredOn: row.occurredOn,
+          value: Number(row.value),
+          note: row.note,
+        }))
+      },
+      async addProgress(objectiveId, input) {
+        await http.post<unknown>(`${ENDPOINTS.goalObjectives}/${objectiveId}/progress`, {
+          occurredOn: input.occurredOn,
+          value: input.value.toFixed(2),
+          note: input.note ?? undefined,
+        })
+      },
+      async deleteProgress(id) {
+        await http.delete<void>(`${ENDPOINTS.goalProgress}/${id}`)
+      },
+    },
+  }
+}
+
+function toWishItem(item: ApiWishItem) {
+  return {
+    id: item.id,
+    description: item.description,
+    estimatedAmount: decimalToCents(item.estimatedAmount),
+    desiredDate: item.desiredDate,
+    priority: item.priority === 'LOW' ? 'baixa' as const : item.priority === 'HIGH' ? 'alta' as const : 'media' as const,
+    productUrl: item.productUrl,
+    notes: item.notes,
+    status:
+      item.status === 'WANTED'
+        ? 'desejado' as const
+        : item.status === 'PLANNED'
+          ? 'planejado' as const
+          : item.status === 'PURCHASED'
+            ? 'comprado' as const
+            : 'arquivado' as const,
+  }
+}
+
+function wishPayload(input: import('../contracts').WishInput) {
+  return {
+    description: input.description,
+    estimatedAmount: centsToDecimal(input.estimatedAmount),
+    desiredDate: input.desiredDate ?? null,
+    priority: input.priority === 'baixa' ? 'LOW' : input.priority === 'alta' ? 'HIGH' : 'MEDIUM',
+    productUrl: input.productUrl ?? null,
+    notes: input.notes ?? null,
+  }
+}
+
+function toPlannedExpense(item: ApiPlannedExpense) {
+  return {
+    id: item.id,
+    wishItemId: item.wishItemId,
+    accountId: item.accountId,
+    accountName: item.account?.name ?? '—',
+    cardId: item.cardId,
+    cardName: item.card?.name ?? null,
+    categoryId: item.categoryId,
+    categoryName: item.category?.name ?? '—',
+    description: item.description,
+    amount: decimalToCents(item.amount),
+    plannedDate: item.plannedDate,
+    method: methodFromApi(item.paymentMethod) ?? 'pix',
+    expenseMode: item.entryMode === 'INSTALLMENT' ? 'parcelada' as const : 'unica' as const,
+    installmentCount: item.installmentCount,
+    includedInSimulation: item.includedInSimulation,
+    status:
+      item.status === 'PLANNED'
+        ? 'planejado' as const
+        : item.status === 'REALIZED'
+          ? 'realizado' as const
+          : 'cancelado' as const,
+    actualPurchaseDate: item.actualPurchaseDate,
+    realizedTransactionId: item.realizedTransactionId,
+  }
+}
+
+function plannedExpensePayload(input: import('../contracts').PlannedExpenseInput) {
+  return {
+    wishItemId: input.wishItemId ?? undefined,
+    accountId: input.accountId ?? undefined,
+    cardId: input.cardId ?? undefined,
+    categoryId: input.categoryId,
+    description: input.description,
+    amount: centsToDecimal(input.amount),
+    plannedDate: input.plannedDate,
+    paymentMethod: methodToApi(input.method),
+    entryMode: input.expenseMode === 'parcelada' ? 'INSTALLMENT' : 'ONE_TIME',
+    installmentCount: input.expenseMode === 'parcelada' ? input.installmentCount : undefined,
+    includedInSimulation: input.includedInSimulation,
+  }
+}
+
+function toPersonalCommitment(item: ApiPersonalCommitment) {
+  return {
+    id: item.id,
+    beneficiaryName: item.beneficiaryName,
+    description: item.description,
+    amount: decimalToCents(item.amount),
+    accountId: item.accountId,
+    accountName: item.account?.name ?? '—',
+    cardId: item.cardId,
+    cardName: item.card?.name ?? null,
+    categoryId: item.categoryId,
+    categoryName: item.category?.name ?? '—',
+    method: methodFromApi(item.paymentMethod) ?? 'pix',
+    schedule: item.scheduleType === 'INSTALLMENT' ? 'parcelado' as const : 'recorrente' as const,
+    startDate: item.startDate,
+    installmentCount: item.installmentCount,
+    endDate: item.endDate,
+    includedInSimulation: item.includedInSimulation,
+    status: item.status === 'ACTIVE'
+      ? 'ativo' as const
+      : item.status === 'PAUSED'
+        ? 'pausado' as const
+        : item.status === 'COMPLETED'
+          ? 'concluido' as const
+          : 'cancelado' as const,
+    paidOccurrences: item.paidOccurrences,
+  }
+}
+
+function commitmentPayload(input: import('../contracts').PersonalCommitmentInput) {
+  return {
+    beneficiaryName: input.beneficiaryName,
+    description: input.description,
+    amount: centsToDecimal(input.amount),
+    accountId: input.accountId ?? undefined,
+    cardId: input.cardId ?? undefined,
+    categoryId: input.categoryId,
+    paymentMethod: methodToApi(input.method),
+    scheduleType: input.schedule === 'parcelado' ? 'INSTALLMENT' : 'RECURRING',
+    startDate: input.startDate,
+    installmentCount: input.schedule === 'parcelado' ? input.installmentCount : undefined,
+    endDate: input.schedule === 'recorrente' ? input.endDate : undefined,
+    includedInSimulation: input.includedInSimulation,
   }
 }
 
@@ -450,4 +883,123 @@ function methodLabel(method: string): string {
   if (method === 'DEBIT') return 'Débito'
   if (method === 'CREDIT') return 'Crédito'
   return 'Outro'
+}
+
+/* ----------------------------------- Metas ---------------------------------- */
+
+const METRIC_FROM_API = {
+  COMPLETION: 'conclusao',
+  COUNT: 'contagem',
+  AMOUNT: 'valor',
+  PERCENT: 'percentual',
+} as const
+
+const METRIC_TO_API = {
+  conclusao: 'COMPLETION',
+  contagem: 'COUNT',
+  valor: 'AMOUNT',
+  percentual: 'PERCENT',
+} as const
+
+const CYCLE_STATUS_FROM_API = {
+  PLANNED: 'planejado',
+  ACTIVE: 'ativo',
+  CLOSED: 'encerrado',
+} as const
+
+const OBJECTIVE_STATUS_FROM_API = {
+  ACTIVE: 'ativo',
+  ACHIEVED: 'alcancado',
+  ABANDONED: 'abandonado',
+} as const
+
+function toCycleSummary(
+  cycle: import('./apiTypes').ApiGoalCycle,
+  summary: import('./apiTypes').ApiGoalSummary,
+): GoalCycleSummary {
+  return {
+    id: cycle.id,
+    name: cycle.name,
+    startDate: cycle.startDate,
+    endDate: cycle.endDate,
+    expectedErrorMargin: Number(cycle.expectedErrorMargin),
+    status: CYCLE_STATUS_FROM_API[cycle.status],
+    note: cycle.note,
+    realErrorMargin: Number(summary.realErrorMargin),
+    projectedErrorMargin: Number(summary.projectedErrorMargin),
+    deviation: Number(summary.deviation),
+    withinMargin: summary.withinMargin,
+    elapsedFraction: Number(summary.elapsedFraction),
+    objectiveCount: summary.objectiveCount,
+  }
+}
+
+function toCycleDetail(result: ApiGoalCycleResult): GoalCycleDetail {
+  return {
+    ...toCycleSummary(result.cycle, result.summary),
+    objectives: result.objectives.map((objective) => ({
+      id: objective.id,
+      title: objective.title,
+      description: null,
+      metricType: METRIC_FROM_API[objective.metricType],
+      direction: objective.direction === 'DECREASE' ? 'reduzir' : 'aumentar',
+      baselineValue: Number(objective.baselineValue),
+      targetValue: Number(objective.targetValue),
+      currentValue: Number(objective.currentValue),
+      unit: objective.unit,
+      weight: Number(objective.weight),
+      expectedErrorMargin: Number(objective.expectedErrorMargin),
+      attainment: Number(objective.attainment),
+      errorPercent: Number(objective.errorPercent),
+      withinMargin: objective.withinMargin,
+      status: OBJECTIVE_STATUS_FROM_API[objective.status],
+    })),
+  }
+}
+
+function toObjectiveRecord(objective: ApiGoalObjective) {
+  return {
+    id: objective.id,
+    cycleId: objective.cycleId,
+    title: objective.title,
+    description: objective.description,
+    metricType: METRIC_FROM_API[objective.metricType],
+    direction: objective.direction === 'DECREASE' ? ('reduzir' as const) : ('aumentar' as const),
+    baselineValue: Number(objective.baselineValue),
+    targetValue: Number(objective.targetValue),
+    currentValue: Number(objective.currentValue),
+    unit: objective.unit,
+    weight: Number(objective.weight),
+    expectedErrorMargin:
+      objective.expectedErrorMargin === null ? null : Number(objective.expectedErrorMargin),
+    status: OBJECTIVE_STATUS_FROM_API[objective.status],
+    cycleStartDate: objective.cycleStartDate,
+    cycleEndDate: objective.cycleEndDate,
+    cycleStatus: CYCLE_STATUS_FROM_API[objective.cycleStatus],
+  }
+}
+
+function cyclePayload(input: GoalCycleInput) {
+  return {
+    name: input.name,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    expectedErrorMargin: input.expectedErrorMargin.toFixed(2),
+    note: input.note ?? undefined,
+  }
+}
+
+function objectivePayload(input: GoalObjectiveInput) {
+  return {
+    title: input.title,
+    description: input.description ?? undefined,
+    metricType: METRIC_TO_API[input.metricType],
+    direction: input.direction === 'reduzir' ? 'DECREASE' : 'INCREASE',
+    baselineValue: input.baselineValue.toFixed(2),
+    targetValue: input.targetValue.toFixed(2),
+    unit: input.unit ?? undefined,
+    weight: input.weight.toFixed(2),
+    expectedErrorMargin:
+      input.expectedErrorMargin === null ? undefined : input.expectedErrorMargin.toFixed(2),
+  }
 }

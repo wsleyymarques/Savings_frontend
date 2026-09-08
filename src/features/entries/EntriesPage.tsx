@@ -5,12 +5,15 @@ import { Tabs } from '../../components/ui/Tabs'
 import { Badge } from '../../components/ui/Badge'
 import { Money } from '../../components/finance/Money'
 import { IconButton } from '../../components/ui/IconButton'
+import { DropdownMenu, MenuItem, MenuSeparator } from '../../components/ui/DropdownMenu'
 import { EmptyState } from '../../components/ui/States'
 import { Button } from '../../components/ui/Button'
 import { SelectField, TextField } from '../../components/ui/Field'
 import { useDrawer, useScope, useSession } from '../../app/contexts'
 import { useAccountScope } from '../../app/useScopeLabel'
-import { useCategoriesQuery, useTransactionsQuery } from '../../services/queries'
+import { useCategoriesQuery, useDeleteEntryMutation, useTransactionsQuery } from '../../services/queries'
+import { messageFor, type EntryRow } from '../../services'
+import { useToast } from '../../components/ui/toastContext'
 import { formatDate } from '../../lib/date'
 import { today } from '../../lib/today'
 import { buildPeriod, DEFAULT_PERIOD_PRESET, type PeriodPreset } from '../../lib/period'
@@ -27,6 +30,8 @@ export function EntriesPage() {
   const { status } = useSession()
   const { scopeLabel, hasAccounts, accountsLoaded } = useAccountScope()
   const drawer = useDrawer()
+  const toast = useToast()
+  const deleteEntry = useDeleteEntryMutation()
 
   const now = today()
   const [tab, setTab] = useState<TabValue>('todos')
@@ -66,6 +71,23 @@ export function EntriesPage() {
     setMethod('')
     setExpenseMode('')
     setPreset('tudo')
+  }
+
+  async function handleDelete(row: EntryRow) {
+    const recurring = row.expenseMode === 'recorrente' && Boolean(row.recurringRuleId)
+    const action = recurring ? 'cancelar esta recorrência' : 'excluir este lançamento'
+    if (!window.confirm(`Deseja ${action}? Essa ação não pode ser desfeita.`)) return
+
+    try {
+      await deleteEntry.mutateAsync({
+        id: row.sourceId,
+        kind: row.kind as 'receita' | 'despesa',
+        recurring,
+      })
+      toast.notify(recurring ? 'Recorrência cancelada' : 'Lançamento excluído')
+    } catch (error) {
+      toast.notifyError(messageFor(error))
+    }
   }
 
   return (
@@ -199,14 +221,23 @@ export function EntriesPage() {
                       {data.items.map((row) => (
                         <tr key={row.id}>
                           <td className="tabular">{formatDate(row.date)}</td>
-                          <td>{row.description}</td>
+                          <td>
+                            {row.description}
+                            {row.beneficiaryName ? <div className="caption text-muted">Para {row.beneficiaryName}</div> : null}
+                          </td>
                           <td>
                             <Badge
                               tone={
-                                row.kind === 'receita' ? 'success' : row.kind === 'pagamento' ? 'info' : 'neutral'
+                                row.kind === 'receita' || row.projected
+                                  ? row.projected ? 'info' : 'success'
+                                  : row.kind === 'pagamento' ? 'info' : 'neutral'
                               }
                             >
-                              {row.kind === 'receita'
+                              {row.projected
+                                ? row.personalCommitmentId
+                                  ? `Compromisso previsto · ${row.expenseMode === 'parcelada' ? `Parcela ${row.installmentNumber}/${row.installmentCount}` : 'Recorrente'}`
+                                  : 'Recorrente prevista · Crédito'
+                                : row.kind === 'receita'
                                 ? 'Receita'
                                 : row.kind === 'pagamento'
                                   ? 'Pagamento de fatura'
@@ -224,17 +255,56 @@ export function EntriesPage() {
                           </td>
                           <td className="cell-actions">
                             {row.editable ? (
-                              <IconButton
-                                icon="edit"
-                                label={`Editar ${row.description}`}
-                                onClick={() =>
-                                  drawer.open(
-                                    row.kind === 'receita'
-                                      ? { kind: 'receita', id: row.sourceId }
-                                      : { kind: 'gasto', id: row.sourceId },
-                                  )
-                                }
-                              />
+                              <DropdownMenu
+                                label={`Opções de ${row.description}`}
+                                align="end"
+                                placement="top"
+                                trigger={({ ref, ...props }) => (
+                                  <IconButton
+                                    ref={ref}
+                                    icon="more"
+                                    label={`Opções de ${row.description}`}
+                                    {...props}
+                                  />
+                                )}
+                              >
+                                {(close) => (
+                                  <>
+                                    <MenuItem
+                                      onClick={() => {
+                                        close()
+                                        drawer.open(
+                                          row.kind === 'receita'
+                                            ? { kind: 'receita', id: row.sourceId }
+                                            : {
+                                                kind: 'gasto',
+                                                id: row.sourceId,
+                                                recurringRule:
+                                                  row.expenseMode === 'recorrente' &&
+                                                  Boolean(row.recurringRuleId),
+                                              },
+                                        )
+                                      }}
+                                    >
+                                      {row.expenseMode === 'recorrente'
+                                        ? 'Editar recorrência'
+                                        : 'Editar'}
+                                    </MenuItem>
+                                    <MenuSeparator />
+                                    <MenuItem
+                                      disabled={deleteEntry.isPending}
+                                      onClick={() => {
+                                        close()
+                                        void handleDelete(row)
+                                      }}
+                                    >
+                                      {row.expenseMode === 'recorrente'
+                                        ? 'Cancelar recorrência'
+                                        : 'Excluir'}
+                                    </MenuItem>
+                                  </>
+                                )}
+                              </DropdownMenu>
                             ) : (
                               <span className="text-muted caption">—</span>
                             )}

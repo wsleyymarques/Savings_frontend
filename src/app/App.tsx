@@ -14,6 +14,9 @@ import { CardDetailPage } from '../features/cards/CardDetailPage'
 import { InvoicesPage } from '../features/invoices/InvoicesPage'
 import { InvoiceDetailPage } from '../features/invoices/InvoiceDetailPage'
 import { CategoriesPage } from '../features/categories/CategoriesPage'
+import { PlanningPage } from '../features/planning/PlanningPage'
+import { GoalsPage } from '../features/goals/GoalsPage'
+import { CycleDetailPage } from '../features/goals/CycleDetailPage'
 
 export function App() {
   return (
@@ -33,6 +36,9 @@ export function App() {
           <Route path="/faturas" element={<InvoicesPage />} />
           <Route path="/faturas/:id" element={<InvoiceDetailPage />} />
           <Route path="/categorias" element={<CategoriesPage />} />
+          <Route path="/planejamento" element={<PlanningPage />} />
+          <Route path="/metas" element={<GoalsPage />} />
+          <Route path="/metas/:id" element={<CycleDetailPage />} />
           <Route path="/perfil" element={<ProfileRoute />} />
         </Route>
       </Route>

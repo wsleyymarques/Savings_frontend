@@ -184,6 +184,13 @@ export class MockStore {
     this.persist()
   }
 
+  async deleteIncome(id: Id): Promise<void> {
+    await this.write()
+    this.requireUser()
+    this.state = { ...this.state, incomes: this.state.incomes.filter((income) => income.id !== id) }
+    this.persist()
+  }
+
   private validateIncome(input: IncomeInput) {
     const fields: Record<string, string> = {}
     const description = input.description.trim()
@@ -233,6 +240,13 @@ export class MockStore {
         expense.id === id ? { ...expense, ...data } : expense,
       ),
     }
+    this.persist()
+  }
+
+  async deleteExpense(id: Id): Promise<void> {
+    await this.write()
+    this.requireUser()
+    this.state = { ...this.state, expenses: this.state.expenses.filter((expense) => expense.id !== id) }
     this.persist()
   }
 
