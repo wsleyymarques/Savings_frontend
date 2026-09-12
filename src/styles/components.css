@@ -438,3 +438,89 @@ fieldset.field > .field__label {
   .icon-btn { width: 44px; height: 44px; }
   .toast-region { left: var(--space-4); right: var(--space-4); bottom: var(--space-4); max-width: none; }
 }
+
+/* ---------------------- Rosca de participação (REQ-4) ---------------------- */
+.pie {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+}
+
+.pie__graphic {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  border-radius: 50%;
+  flex: none;
+}
+.pie__graphic::after {
+  /* Fura o centro sem depender de máscara, para virar rosca. */
+  content: '';
+  position: absolute;
+  inset: 26%;
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+
+.pie__hole {
+  position: absolute;
+  inset: 26%;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  text-align: center;
+}
+.pie__hole-label {
+  font-size: 11px;
+  line-height: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.pie__hole-value {
+  font-size: 14px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pie__legend {
+  flex: 1 1 240px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.pie__legend-row {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  line-height: 18px;
+}
+.pie__swatch { width: 12px; height: 12px; border-radius: 4px; }
+.pie__legend-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pie__legend-percent {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.pie__legend-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+}
+
+/* ------------- Ações da barra de filtros da tabela (REQ-1) ----------------- */
+.filter-bar__actions {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+  margin-left: auto;
+  align-self: flex-end;
+  padding-bottom: 2px;
+}

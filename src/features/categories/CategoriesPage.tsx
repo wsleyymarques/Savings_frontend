@@ -85,7 +85,7 @@ export function CategoriesPage() {
 
                 <SurfaceCard
                   title="Categorias personalizadas"
-                  description="Cada categoria personalizada pertence a uma única conta financeira."
+                  description="Criadas por você: valem em todas as contas ou apenas na conta escolhida."
                 >
                   {customs.length === 0 ? (
                     <EmptyState
@@ -113,7 +113,9 @@ export function CategoriesPage() {
                           </span>
                           <div className="item-row__main">
                             <span className="item-row__title">{category.name}</span>
-                            <span className="item-row__meta">{category.accountName ?? '—'}</span>
+                            <span className="item-row__meta">
+                              {category.accountName ? `Apenas ${category.accountName}` : 'Todas as contas'}
+                            </span>
                           </div>
                           <Badge tone="info">Personalizada</Badge>
                           {category.archived ? <Badge tone="warning">Arquivada</Badge> : null}

@@ -218,9 +218,11 @@ function ExpenseFields({ title, expenseId, recurringRule = false, initial, onClo
   async function handleSubmitCategory() {
     setCategoryError(null)
     try {
+      // Criada aqui, a categoria vale em todas as contas: é o alcance que não
+      // deixa o gasto seguinte ficar sem ela por causa do cartão escolhido.
       const category = await categoryMutation.mutateAsync({
         name: categoryName,
-        accountId: effectiveAccountId || null,
+        accountId: null,
       })
       form.patch({ categoryId: category.id })
       setCategoryName('')
@@ -427,7 +429,7 @@ function ExpenseFields({ title, expenseId, recurringRule = false, initial, onClo
           value={form.values.categoryId}
           placeholder="Selecione a categoria"
           error={form.fieldErrors.categoryId}
-          hint="Categorias padrão valem para todas as contas; as personalizadas pertencem a uma conta."
+          hint="Além das padrão, aparecem as suas categorias válidas para esta conta."
           disabled={!effectiveAccountId}
           onChange={(event) => {
             form.patch({ categoryId: event.target.value })
@@ -456,9 +458,8 @@ function ExpenseFields({ title, expenseId, recurringRule = false, initial, onClo
 
       <div className="drawer-step" hidden={!inCategoryStep}>
         <InlineAlert tone="info">
-          A categoria será vinculada à conta{' '}
-          <strong>{accounts.find((a) => a.id === effectiveAccountId)?.name ?? '—'}</strong>. Seu
-          rascunho do gasto está preservado.
+          A categoria ficará disponível em <strong>todas as contas</strong>. Para prendê-la a uma
+          conta, use a página Categorias. Seu rascunho do gasto está preservado.
         </InlineAlert>
         <TextField
           label="Nome da categoria"

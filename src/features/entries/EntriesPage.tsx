@@ -14,7 +14,7 @@ import { useAccountScope } from '../../app/useScopeLabel'
 import { useCategoriesQuery, useDeleteEntryMutation, useTransactionsQuery } from '../../services/queries'
 import { messageFor, type EntryRow } from '../../services'
 import { useToast } from '../../components/ui/toastContext'
-import { formatDate } from '../../lib/date'
+import { formatDate, formatDateTime, formatTime } from '../../lib/date'
 import { today } from '../../lib/today'
 import { buildPeriod, DEFAULT_PERIOD_PRESET, type PeriodPreset } from '../../lib/period'
 import { PAYMENT_METHOD_SHORT, type ExpenseMode, type PaymentMethod } from '../../data/types'
@@ -22,8 +22,16 @@ import { QueryBoundary } from '../shared/QueryBoundary'
 import { PeriodFilter } from '../shared/PeriodFilter'
 import { NoAccounts } from '../shared/NoAccounts'
 import { NewEntryMenu } from '../shared/NewEntryMenu'
+import { CommitmentList } from './CommitmentList'
+import { BillsToPay } from './BillsToPay'
 
-type TabValue = 'todos' | 'receitas' | 'despesas'
+type TabValue = 'todos' | 'receitas' | 'despesas' | 'compromissos' | 'contas-a-pagar'
+
+const EXPENSE_MODES: { value: ExpenseMode; label: string }[] = [
+  { value: 'unica', label: 'À vista' },
+  { value: 'parcelada', label: 'Parcelada' },
+  { value: 'recorrente', label: 'Recorrente' },
+]
 
 export function EntriesPage() {
   const { accountId } = useScope()
@@ -44,6 +52,9 @@ export function EntriesPage() {
 
   const period = useMemo(() => buildPeriod(preset, now, custom), [preset, now, custom])
   const enabled = status === 'authenticated'
+  const showingCommitments = tab === 'compromissos'
+  const showingBills = tab === 'contas-a-pagar'
+  const showingTable = !showingCommitments && !showingBills
 
   const categories = useCategoriesQuery({ accountId }, enabled)
   const transactions = useTransactionsQuery(
@@ -51,13 +62,13 @@ export function EntriesPage() {
       accountId,
       start: period.start,
       end: period.end,
-      kind: tab,
+      kind: showingTable ? tab : 'todos',
       search,
       categoryId: categoryId || null,
       method: (method || null) as PaymentMethod | null,
       expenseMode: (expenseMode || null) as ExpenseMode | null,
     },
-    enabled,
+    enabled && showingTable,
   )
 
   const hasDetailFilters =
@@ -65,7 +76,7 @@ export function EntriesPage() {
   const hasFilters = hasDetailFilters || preset !== 'tudo'
 
   function clearFilters() {
-    setTab('todos')
+    setTab(tab === 'compromissos' || tab === 'contas-a-pagar' ? tab : 'todos')
     setSearch('')
     setCategoryId('')
     setMethod('')
@@ -94,8 +105,16 @@ export function EntriesPage() {
     <>
       <PageHeader
         title="Lançamentos"
-        description={`Receitas, despesas e quitações de fatura · ${scopeLabel}`}
-        actions={<NewEntryMenu disabled={!hasAccounts} />}
+        description={`Receitas, despesas, compromissos e quitações de fatura · ${scopeLabel}`}
+        actions={
+          showingCommitments || showingBills ? (
+            <Button variant="primary" icon="plus" disabled={!hasAccounts} onClick={() => drawer.open({ kind: 'compromisso' })}>
+              Novo compromisso
+            </Button>
+          ) : (
+            <NewEntryMenu disabled={!hasAccounts} />
+          )
+        }
       />
 
       {accountsLoaded && !hasAccounts ? (
@@ -103,8 +122,9 @@ export function EntriesPage() {
           <NoAccounts />
         </SurfaceCard>
       ) : (
-        <SurfaceCard flush>
-          <div style={{ padding: 'var(--space-6) var(--space-6) 0' }}>
+        <>
+        <SurfaceCard flush={showingTable}>
+          <div style={showingTable ? { padding: 'var(--space-6) var(--space-6) 0' } : undefined}>
             <Tabs
               label="Tipo de lançamento"
               value={tab}
@@ -113,9 +133,12 @@ export function EntriesPage() {
                 { value: 'todos', label: 'Todos' },
                 { value: 'receitas', label: 'Receitas' },
                 { value: 'despesas', label: 'Despesas' },
+                { value: 'compromissos', label: 'Compromissos' },
+                { value: 'contas-a-pagar', label: 'Contas a pagar' },
               ]}
             />
 
+            {!showingTable ? null : <>
             <div className="filter-bar" style={{ marginTop: 'var(--space-4)' }}>
               <div className="field field--grow">
                 <TextField
@@ -132,16 +155,20 @@ export function EntriesPage() {
                 end={custom.end}
                 onCustomChange={setCustom}
               />
-              <SelectField
-                label="Tipo da despesa"
-                value={expenseMode}
-                placeholder="Todos"
-                onChange={(event) => setExpenseMode(event.target.value)}
-              >
-                <option value="unica">À vista</option>
-                <option value="parcelada">Parcelada</option>
-                <option value="recorrente">Recorrente</option>
-              </SelectField>
+              {tab === 'receitas' ? null : (
+                <SelectField
+                  label="Tipo da despesa"
+                  value={expenseMode}
+                  placeholder="Todos"
+                  onChange={(event) => setExpenseMode(event.target.value)}
+                >
+                  {EXPENSE_MODES.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </SelectField>
+              )}
               <SelectField
                 label="Categoria"
                 value={categoryId}
@@ -167,13 +194,21 @@ export function EntriesPage() {
                   </option>
                 ))}
               </SelectField>
+              {hasFilters ? (
+                <div className="filter-bar__actions">
+                  <Button variant="ghost" onClick={clearFilters}>
+                    Limpar filtros
+                  </Button>
+                </div>
+              ) : null}
             </div>
             <p className="caption text-muted" style={{ marginTop: 'var(--space-2)' }}>
               Período {period.label}. A conta vem do seletor da barra lateral.
             </p>
+            </>}
           </div>
 
-          <QueryBoundary query={transactions} rows={5}>
+          {!showingTable ? null : <QueryBoundary query={transactions} rows={5}>
             {(data) =>
               data.items.length === 0 ? (
                 hasFilters ? (
@@ -203,7 +238,7 @@ export function EntriesPage() {
                     </caption>
                     <thead>
                       <tr>
-                        <th scope="col">Data</th>
+                        <th scope="col">Data e hora</th>
                         <th scope="col">Descrição</th>
                         <th scope="col">Tipo</th>
                         <th scope="col">Categoria</th>
@@ -220,7 +255,12 @@ export function EntriesPage() {
                     <tbody>
                       {data.items.map((row) => (
                         <tr key={row.id}>
-                          <td className="tabular">{formatDate(row.date)}</td>
+                          <td className="tabular" title={`Cadastrado em ${formatDateTime(row.createdAt)}`}>
+                            {formatDate(row.date)}
+                            {row.projected ? null : (
+                              <div className="caption text-muted">{formatTime(row.createdAt)}</div>
+                            )}
+                          </td>
                           <td>
                             {row.description}
                             {row.beneficiaryName ? <div className="caption text-muted">Para {row.beneficiaryName}</div> : null}
@@ -316,8 +356,11 @@ export function EntriesPage() {
                 </div>
               )
             }
-          </QueryBoundary>
+          </QueryBoundary>}
         </SurfaceCard>
+        {showingCommitments ? <CommitmentList accountId={accountId} enabled={enabled} /> : null}
+        {showingBills ? <BillsToPay accountId={accountId} enabled={enabled} /> : null}
+        </>
       )}
     </>
   )

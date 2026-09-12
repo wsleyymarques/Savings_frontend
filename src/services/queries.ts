@@ -292,7 +292,7 @@ export function useCategoryMutation(id?: Id) {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (input: CategoryInput) =>
-      id ? services.categories.rename(id, { name: input.name }) : services.categories.create(input),
+      id ? services.categories.rename(id, input) : services.categories.create(input),
     onSuccess: () => invalidate(client, ['categories', 'transactions', 'overview']),
   })
 }

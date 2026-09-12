@@ -81,3 +81,25 @@ export function isWithin(value: CivilDate, start: CivilDate, end: CivilDate): bo
 export function compareDateDesc(a: CivilDate, b: CivilDate): number {
   return a < b ? 1 : a > b ? -1 : 0
 }
+
+/**
+ * Data e hora do cadastro no fuso do navegador. A API envia um instante ISO;
+ * a listagem usa esse valor para desempatar lançamentos do mesmo dia.
+ */
+export function formatDateTime(value: string): string {
+  const instant = new Date(value)
+  if (Number.isNaN(instant.getTime())) return '—'
+  return instant.toLocaleString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+export function formatTime(value: string): string {
+  const instant = new Date(value)
+  if (Number.isNaN(instant.getTime())) return ''
+  return instant.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}

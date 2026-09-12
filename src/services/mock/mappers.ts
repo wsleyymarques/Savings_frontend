@@ -12,6 +12,7 @@ import type { CivilDate } from '../../lib/date'
 import type { Account, Card, Category, FinanceState, Id, Invoice } from '../../data/types'
 import type {
   AccountSummary,
+  CardCurrentInvoice,
   CardSummary,
   CategoryRow,
   CreditPurchase,
@@ -29,7 +30,32 @@ export function toAccountSummary(state: FinanceState, account: Account): Account
   }
 }
 
-export function toCardSummary(state: FinanceState, card: Card): CardSummary {
+/** Ciclo aberto agora: o primeiro fechamento ainda não alcançado pela data. */
+export function currentCardInvoice(
+  state: FinanceState,
+  card: Card,
+  today: CivilDate,
+): CardCurrentInvoice | null {
+  if (card.creditLimit === null) return null
+  const invoice = state.invoices
+    .filter((item) => item.cardId === card.id && item.closingDate >= today)
+    .sort((a, b) => a.closingDate.localeCompare(b.closingDate))[0]
+  if (!invoice) return null
+  const totals = invoiceTotals(state, invoice, today)
+  return {
+    id: invoice.id,
+    cycleMonth: `${invoice.dueDate.slice(0, 7)}-01`,
+    cycleLabel: invoice.cycleLabel,
+    closingDate: invoice.closingDate,
+    dueDate: invoice.dueDate,
+    total: totals.total,
+    paid: totals.paid,
+    remaining: totals.remaining,
+    payment: totals.payment,
+  }
+}
+
+export function toCardSummary(state: FinanceState, card: Card, today: CivilDate): CardSummary {
   const committed = cardCommitted(state, card.id)
   return {
     id: card.id,
@@ -44,6 +70,7 @@ export function toCardSummary(state: FinanceState, card: Card): CardSummary {
     available: cardAvailable(state, card),
     closingDay: card.closingDay,
     dueDay: card.dueDay,
+    currentInvoice: currentCardInvoice(state, card, today),
   }
 }
 
@@ -79,7 +106,7 @@ export function toInvoiceSummary(
     remaining: totals.remaining,
     cycle: totals.cycle,
     payment: totals.payment,
-    payable: totals.cycle === 'fechada' && totals.payment === 'nao-paga' && totals.total > 0,
+    payable: totals.payment === 'nao-paga' && totals.remaining > 0,
   }
 }
 
@@ -88,6 +115,7 @@ export function toEntryRows(state: FinanceState, accountIds: Id[], today: CivilD
     const expense = row.kind === 'despesa' ? state.expenses.find((item) => item.id === row.sourceId) : undefined
     return {
       ...row,
+      createdAt: `${row.date}T12:00:00.000Z`,
       projected: false,
       personalCommitmentId: null,
       beneficiaryName: null,

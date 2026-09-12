@@ -36,10 +36,12 @@ const NAV_SECTIONS: { app: string; items: NavItem[] }[] = [
 
 interface SidebarProps {
   open: boolean
+  collapsed: boolean
+  onToggleCollapsed: () => void
   onNavigate: () => void
 }
 
-export function Sidebar({ open, onNavigate }: SidebarProps) {
+export function Sidebar({ open, collapsed, onToggleCollapsed, onNavigate }: SidebarProps) {
   const { accountId, setAccountId } = useScope()
   const { accounts, accountsQuery, scopeLabel } = useAccountScope()
   const { user, signOut, status } = useSession()
@@ -54,20 +56,39 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
 
   return (
     <nav
-      className={['sidebar', open ? 'sidebar--open' : ''].filter(Boolean).join(' ')}
+      className={['sidebar', open ? 'sidebar--open' : '', collapsed ? 'sidebar--collapsed' : '']
+        .filter(Boolean)
+        .join(' ')}
       aria-label="Navegação principal"
       id="navegacao-principal"
     >
-      <NavLink className="sidebar__brand" to="/visao-geral" onClick={onNavigate}>
-        <span className="sidebar__mark" aria-hidden="true" />
-        Minhas Finanças
-      </NavLink>
+      <div className="sidebar__header">
+        <NavLink className="sidebar__brand" to="/visao-geral" onClick={onNavigate}>
+          <span className="sidebar__mark" aria-hidden="true" />
+          <span className="sidebar__brand-text">Minhas Finanças</span>
+        </NavLink>
+        <button
+          type="button"
+          className="sidebar__collapse"
+          onClick={onToggleCollapsed}
+          aria-pressed={collapsed}
+          title={collapsed ? 'Expandir navegação' : 'Minimizar navegação'}
+        >
+          <Icon name={collapsed ? 'chevron-right' : 'arrow-left'} size={18} />
+          <span className="visually-hidden">
+            {collapsed ? 'Expandir navegação' : 'Minimizar navegação'}
+          </span>
+        </button>
+      </div>
 
       <div className="sidebar__scope">
         <DropdownMenu
           label="Escolher conta financeira"
           trigger={({ ref, ...props }) => (
-            <button ref={ref} type="button" className="scope" {...props}>
+            <button ref={ref} type="button" className="scope" title={scopeLabel} {...props}>
+              <span className="scope__initials" aria-hidden="true">
+                {initialsOf(selected?.name ?? 'Todas as contas')}
+              </span>
               <span className="scope__top">
                 <span className="scope__eyebrow">CONTA ATIVA</span>
                 {accountsQuery.isSuccess ? (
@@ -137,6 +158,7 @@ export function Sidebar({ open, onNavigate }: SidebarProps) {
                 <NavLink
                   to={item.to}
                   onClick={onNavigate}
+                  title={item.label}
                   className={({ isActive }) =>
                     ['nav-item', isActive ? 'nav-item--active' : ''].filter(Boolean).join(' ')
                   }

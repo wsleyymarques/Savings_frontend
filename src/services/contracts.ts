@@ -69,6 +69,20 @@ export interface AccountDetail extends AccountSummary {
   cards: CardSummary[]
 }
 
+/** Fatura do ciclo aberto agora: a que recebe uma compra feita hoje. */
+export interface CardCurrentInvoice {
+  /** Nulo enquanto o ciclo ainda não tiver compras. */
+  id: Id | null
+  cycleMonth: CivilDate
+  cycleLabel: string
+  closingDate: CivilDate
+  dueDate: CivilDate
+  total: Cents
+  paid: Cents
+  remaining: Cents
+  payment: PaymentStatus
+}
+
 export interface CardSummary {
   id: Id
   name: string
@@ -82,6 +96,8 @@ export interface CardSummary {
   available: Cents
   closingDay: number | null
   dueDay: number | null
+  /** Só existe em cartão com função crédito. */
+  currentInvoice: CardCurrentInvoice | null
 }
 
 export interface CardDetail extends CardSummary {
@@ -110,6 +126,8 @@ export interface EntryRow {
   kind: EntryKind
   sourceId: Id
   date: CivilDate
+  /** Data e hora do cadastro; desempata a ordenação por data do lançamento. */
+  createdAt: string
   description: string
   categoryLabel: string | null
   categoryArchived: boolean
@@ -148,7 +166,10 @@ export interface OverviewSummary {
     creditLimit: Cents
     creditCommitted: Cents
     creditAvailable: Cents
+    /** Faturas que vencem até o fim do mês corrente, mais as já vencidas. */
     openInvoices: Cents
+    /** Parcela do valor acima que já passou do vencimento. */
+    overdueInvoices: Cents
   }
   period: {
     income: Cents
@@ -182,7 +203,7 @@ export interface InvoiceSummary {
   remaining: Cents
   cycle: CycleStatus
   payment: PaymentStatus
-  /** Elegível ao registro de pagamento integral proposto na V1. */
+  /** Elegível ao registro de pagamento, integral ou parcial. */
   payable: boolean
 }
 
@@ -255,6 +276,7 @@ export interface CardInput {
 
 export interface CategoryInput {
   name: string
+  /** Nulo cria a categoria disponível em todas as contas do usuário. */
   accountId: Id | null
 }
 
@@ -262,6 +284,8 @@ export interface InvoicePaymentInput {
   invoiceId: Id
   accountId: Id | null
   date: CivilDate
+  /** Ausente quita o valor restante; informado registra pagamento parcial. */
+  amount?: Cents | null
 }
 
 export type WishPriority = 'baixa' | 'media' | 'alta'
@@ -556,7 +580,7 @@ export interface CategoriesService {
   /** Categorias que podem ser escolhidas em um gasto daquela conta. */
   selectable(params: ScopeParams): Promise<CategoryRow[]>
   create(input: CategoryInput): Promise<CategoryRow>
-  rename(id: Id, input: { name: string }): Promise<CategoryRow>
+  rename(id: Id, input: CategoryInput): Promise<CategoryRow>
   archive(id: Id): Promise<void>
 }
 

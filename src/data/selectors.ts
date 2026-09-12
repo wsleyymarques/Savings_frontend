@@ -3,6 +3,7 @@ import {
   addMonths,
   compareDateDesc,
   daysInMonth,
+  endOfMonth,
   isWithin,
   monthLabelFrom,
   toCivilDate,
@@ -168,13 +169,25 @@ export function invoiceTotals(state: FinanceState, invoice: Invoice, today: Civi
   }
 }
 
-export function openInvoiceTotal(state: FinanceState, accountIds: Id[], today: CivilDate): Cents {
+/**
+ * "Faturas em aberto" é o caixa do mês, não o crédito comprometido do cartão:
+ * entra o que vence até o fim do mês corrente somado ao que já venceu e segue
+ * sem pagamento. `onlyOverdue` isola a parcela atrasada para a legenda.
+ */
+export function openInvoiceTotal(
+  state: FinanceState,
+  accountIds: Id[],
+  today: CivilDate,
+  onlyOverdue = false,
+): Cents {
   const cardIds = state.cards
     .filter((card) => accountIds.includes(card.accountId))
     .map((card) => card.id)
+  const limit = onlyOverdue ? today : endOfMonth(today)
   return sum(
     state.invoices
       .filter((invoice) => cardIds.includes(invoice.cardId))
+      .filter((invoice) => (onlyOverdue ? invoice.dueDate < limit : invoice.dueDate <= limit))
       .map((invoice) => invoiceTotals(state, invoice, today).remaining),
   )
 }
@@ -242,7 +255,10 @@ export function selectableCategories(state: FinanceState, accountId: Id | null):
     .filter((category) => !category.archived)
     .filter(
       (category) =>
-        category.origin === 'padrao' || (accountId !== null && category.accountId === accountId),
+        category.origin === 'padrao' ||
+        // Personalizada sem conta vale em todas; com conta, só naquela.
+        category.accountId === null ||
+        (accountId !== null && category.accountId === accountId),
     )
     .sort(sortCategories)
 }
@@ -252,7 +268,8 @@ export function categoriesInScope(state: FinanceState, accountIds: Id[]): Catego
     .filter(
       (category) =>
         category.origin === 'padrao' ||
-        (category.accountId !== null && accountIds.includes(category.accountId)),
+        category.accountId === null ||
+        accountIds.includes(category.accountId),
     )
     .sort(sortCategories)
 }
@@ -266,6 +283,7 @@ export function isCategoryValidForAccount(category: Category | undefined, accoun
   if (!category) return false
   if (category.archived) return false
   if (category.origin === 'padrao') return true
+  if (category.accountId === null) return true
   return category.accountId === accountId
 }
 

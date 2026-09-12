@@ -92,8 +92,8 @@ export function InvoiceDetailPage() {
               </div>
               {data.cycle === 'aberta' ? (
                 <InlineAlert tone="info">
-                  O ciclo ainda está aberto. O registro de pagamento integral fica disponível após o
-                  fechamento em {formatDate(data.closingDate)}.
+                  O ciclo ainda está aberto até {formatDate(data.closingDate)}. Pagar agora antecipa a
+                  fatura: compras novas deste ciclo voltam a somar nela.
                 </InlineAlert>
               ) : null}
             </SurfaceCard>

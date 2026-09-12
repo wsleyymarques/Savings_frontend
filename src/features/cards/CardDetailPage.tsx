@@ -56,6 +56,40 @@ export function CardDetailPage() {
                 {data.creditLimit !== null ? (
                   <>
                     <CreditUsage limit={data.creditLimit} committed={data.committed} />
+                    {data.currentInvoice ? (
+                      <div className="card-tile__invoice" style={{ marginTop: 'var(--space-3)' }}>
+                        <div className="card-tile__invoice-copy">
+                          <span className="card-tile__invoice-label">
+                            Fatura atual · {data.currentInvoice.cycleLabel}
+                          </span>
+                          <strong className="card-tile__invoice-value">
+                            <Money value={data.currentInvoice.total} />
+                          </strong>
+                          <span className="caption text-muted">
+                            Fecha em {formatDate(data.currentInvoice.closingDate)} · vence em{' '}
+                            {formatDate(data.currentInvoice.dueDate)} · restante{' '}
+                            <Money value={data.currentInvoice.remaining} />
+                          </span>
+                        </div>
+                        <div className="item-row__actions">
+                          {data.currentInvoice.id ? (
+                            <Link className="btn btn--secondary" to={`/faturas/${data.currentInvoice.id}`}>
+                              Ver fatura
+                            </Link>
+                          ) : null}
+                          {data.currentInvoice.id && data.currentInvoice.remaining > 0 ? (
+                            <Button
+                              variant="primary"
+                              onClick={() =>
+                                drawer.open({ kind: 'pagamento', invoiceId: data.currentInvoice!.id! })
+                              }
+                            >
+                              Pagar fatura
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    ) : null}
                     <div className="card-tile__dates" style={{ marginTop: 'var(--space-3)' }}>
                       <span>Fechamento: dia {data.closingDay}</span>
                       <span>Vencimento: dia {data.dueDay}</span>

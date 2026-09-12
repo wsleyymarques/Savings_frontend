@@ -42,6 +42,18 @@ export interface ApiCard {
   imageKey: string | null
   committedAmount: string
   availableLimit: string | null
+  currentInvoice?: ApiCardCurrentInvoice | null
+}
+
+export interface ApiCardCurrentInvoice {
+  id: string | null
+  cycleMonth: string
+  closingDate: string
+  dueDate: string
+  totalAmount: string
+  paidAmount: string
+  remainingAmount: string
+  paymentStatus: ApiPaymentStatus
 }
 
 export interface ApiCategory {
@@ -77,6 +89,7 @@ export interface ApiTransaction {
   projected?: boolean
   personalCommitmentId?: string | null
   beneficiaryName?: string | null
+  createdAt?: string
 }
 
 export interface ApiRecurringExpenseRule {
@@ -124,6 +137,8 @@ export interface ApiOverview {
     committedCredit: string
     availableCredit: string
     unpaidInvoices: string
+    invoicesDueThisMonth?: string
+    overdueInvoices?: string
   }
   period: {
     incomes: string

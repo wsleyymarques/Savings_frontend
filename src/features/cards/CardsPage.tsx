@@ -10,6 +10,7 @@ import { EmptyState } from '../../components/ui/States'
 import { useDrawer, useScope, useSession } from '../../app/contexts'
 import { useAccountScope } from '../../app/useScopeLabel'
 import { useCardsQuery } from '../../services/queries'
+import { formatDate } from '../../lib/date'
 import { CardVisual } from './CardVisual'
 import { QueryBoundary } from '../shared/QueryBoundary'
 import { NoAccounts } from '../shared/NoAccounts'
@@ -49,7 +50,18 @@ export function CardsPage() {
             <>
               <div className="grid grid--stats">
                 <StatCard label="Limite total de crédito" value={data.totals.limit} compact />
-                <StatCard label="Crédito comprometido" value={data.totals.committed} compact />
+                <StatCard
+                  label="Fatura atual dos cartões"
+                  value={data.items.reduce((total, card) => total + (card.currentInvoice?.total ?? 0), 0)}
+                  caption="Ciclo aberto, ainda em formação"
+                  compact
+                />
+                <StatCard
+                  label="Crédito comprometido"
+                  value={data.totals.committed}
+                  caption="Todas as faturas ainda não pagas"
+                  compact
+                />
                 <StatCard label="Limite disponível" value={data.totals.available} compact highlight />
               </div>
 
@@ -82,6 +94,35 @@ export function CardsPage() {
                           {card.creditLimit !== null ? (
                             <>
                               <CreditUsage limit={card.creditLimit} committed={card.committed} />
+                              {card.currentInvoice ? (
+                                <div className="card-tile__invoice">
+                                  <div className="card-tile__invoice-copy">
+                                    <span className="card-tile__invoice-label">
+                                      Fatura atual · {card.currentInvoice.cycleLabel}
+                                    </span>
+                                    <strong className="card-tile__invoice-value">
+                                      <Money value={card.currentInvoice.total} />
+                                    </strong>
+                                    <span className="caption text-muted">
+                                      Fecha em {formatDate(card.currentInvoice.closingDate)} · vence em{' '}
+                                      {formatDate(card.currentInvoice.dueDate)}
+                                    </span>
+                                  </div>
+                                  {card.currentInvoice.id && card.currentInvoice.remaining > 0 ? (
+                                    <Button
+                                      variant="primary"
+                                      onClick={() =>
+                                        drawer.open({
+                                          kind: 'pagamento',
+                                          invoiceId: card.currentInvoice!.id!,
+                                        })
+                                      }
+                                    >
+                                      Pagar fatura
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              ) : null}
                               <div className="card-tile__dates">
                                 <span>Fechamento: dia {card.closingDay}</span>
                                 <span>Vencimento: dia {card.dueDay}</span>

@@ -4,6 +4,7 @@ import type { CardFunction, CategoryOrigin, ExpenseMode, PaymentMethod } from '.
 import type { CycleStatus, EntryKind, PaymentStatus } from '../../data/selectors'
 import type {
   AccountSummary,
+  CardCurrentInvoice,
   CardSummary,
   CategoryRow,
   CreditPurchase,
@@ -13,6 +14,7 @@ import type {
 import type {
   ApiAccount,
   ApiCard,
+  ApiCardCurrentInvoice,
   ApiCardFunction,
   ApiCategory,
   ApiInvoice,
@@ -140,6 +142,29 @@ export function toCardSummary(card: ApiCard, accounts: AccountSummary[]): CardSu
     available: card.availableLimit === null ? 0 : decimalToCents(card.availableLimit),
     closingDay: card.closingDay,
     dueDay: card.dueDay,
+    currentInvoice: toCardCurrentInvoice(card.currentInvoice),
+  }
+}
+
+/**
+ * A API separa o crédito comprometido (todas as faturas em aberto) da fatura do
+ * ciclo corrente; a tela do cartão mostra a segunda como "fatura atual".
+ */
+function toCardCurrentInvoice(
+  invoice: ApiCardCurrentInvoice | null | undefined,
+): CardCurrentInvoice | null {
+  if (!invoice) return null
+  const cycleMonth = invoice.cycleMonth.slice(0, 10)
+  return {
+    id: invoice.id,
+    cycleMonth,
+    cycleLabel: formatMonthLabel(cycleMonth),
+    closingDate: invoice.closingDate,
+    dueDate: invoice.dueDate,
+    total: decimalToCents(invoice.totalAmount),
+    paid: decimalToCents(invoice.paidAmount),
+    remaining: decimalToCents(invoice.remainingAmount),
+    payment: invoice.paymentStatus === 'PAID' ? 'paga' : 'nao-paga',
   }
 }
 
@@ -166,6 +191,7 @@ export function toEntryRow(transaction: ApiTransaction): EntryRow {
       ? transaction.recurringRuleId
       : transaction.id,
     date: transaction.effectiveDate,
+    createdAt: transaction.createdAt ?? `${transaction.effectiveDate}T00:00:00.000Z`,
     description: transaction.description,
     categoryLabel: transaction.category?.name ?? null,
     categoryArchived: Boolean(transaction.category?.archivedAt),
@@ -222,6 +248,7 @@ export function toInvoiceSummary(invoice: ApiInvoice): InvoiceSummary {
     remaining,
     cycle,
     payment,
-    payable: cycle === 'fechada' && payment !== 'paga' && remaining > 0,
+    // Pagar antes do fechamento é permitido; só faltar valor importa.
+    payable: payment !== 'paga' && remaining > 0,
   }
 }

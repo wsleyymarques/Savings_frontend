@@ -344,3 +344,84 @@
 .drawer__summary-row { display: flex; justify-content: space-between; gap: var(--space-3); }
 .drawer__summary-row dt { color: var(--color-text-secondary); }
 .drawer__summary-row dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ------------------------- Sidebar minimizada (REQ-1) ----------------------- */
+/* A largura vem de um token local: encolhê-lo reposiciona o conteúdo junto. */
+.shell--nav-collapsed { --sidebar-width: 76px; }
+
+.sidebar__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sidebar__header .sidebar__brand { flex: 1; min-width: 0; }
+.sidebar__brand-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.sidebar__collapse {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.sidebar__collapse:hover { background: var(--color-surface-hover); color: var(--color-text); }
+
+.scope__initials { display: none; }
+
+.sidebar--collapsed { padding-inline: var(--space-2); align-items: stretch; }
+.sidebar--collapsed .sidebar__header { flex-direction: column; gap: var(--space-2); }
+.sidebar--collapsed .sidebar__brand { justify-content: center; }
+.sidebar--collapsed .sidebar__brand-text,
+.sidebar--collapsed .sidebar__section-label,
+.sidebar--collapsed .nav-item__label,
+.sidebar--collapsed .user-button__text,
+.sidebar--collapsed .scope__top,
+.sidebar--collapsed .scope__bottom { display: none; }
+
+.sidebar--collapsed .scope {
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+}
+.sidebar--collapsed .scope__initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+.sidebar--collapsed .nav-item { justify-content: center; padding: 0; gap: 0; }
+.sidebar--collapsed .nav-item__badge {
+  position: absolute;
+  transform: translate(14px, -12px);
+  font-size: 10px;
+  line-height: 15px;
+  padding: 0 5px;
+}
+.sidebar--collapsed .nav-item { position: relative; }
+.sidebar--collapsed .user-button { justify-content: center; padding: var(--space-2) 0; }
+.sidebar--collapsed .user-button > .icon:last-child { display: none; }
+
+@media (max-width: 1024px) {
+  /* No layout móvel a gaveta sempre abre inteira. */
+  .shell--nav-collapsed { --sidebar-width: 240px; }
+  .sidebar--collapsed { padding-inline: var(--space-4); }
+  .sidebar--collapsed .sidebar__collapse { display: none; }
+  .sidebar--collapsed .sidebar__brand-text,
+  .sidebar--collapsed .sidebar__section-label,
+  .sidebar--collapsed .nav-item__label,
+  .sidebar--collapsed .user-button__text,
+  .sidebar--collapsed .scope__top,
+  .sidebar--collapsed .scope__bottom { display: flex; }
+  .sidebar--collapsed .scope__initials { display: none; }
+  .sidebar--collapsed .nav-item { justify-content: flex-start; padding: 0 var(--space-3); gap: var(--space-3); }
+}

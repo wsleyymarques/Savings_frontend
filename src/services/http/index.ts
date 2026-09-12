@@ -38,6 +38,7 @@ import type {
   AccountDetail,
   AccountSummary,
   CardDetail,
+  EntryRow,
   GoalCycleDetail,
   GoalCycleInput,
   GoalCycleSummary,
@@ -83,6 +84,14 @@ export const ENDPOINTS = {
   goalProgress: '/goals/progress',
   health: '/health',
 } as const
+
+/**
+ * Ordem única das listagens: data do lançamento decrescente e, no mesmo dia,
+ * a data e hora do cadastro — o último registrado aparece primeiro.
+ */
+function byDateThenCreatedAt(a: EntryRow, b: EntryRow): number {
+  return b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt)
+}
 
 export function createHttpServices(baseUrl: string): Services {
   const http: HttpClient = createHttpClient(baseUrl, tokenStore)
@@ -191,7 +200,10 @@ export function createHttpServices(baseUrl: string): Services {
             creditLimit: decimalToCents(overview.position.totalCreditLimit),
             creditCommitted: decimalToCents(overview.position.committedCredit),
             creditAvailable: decimalToCents(overview.position.availableCredit),
-            openInvoices: decimalToCents(overview.position.unpaidInvoices),
+            openInvoices: decimalToCents(
+              overview.position.invoicesDueThisMonth ?? overview.position.unpaidInvoices,
+            ),
+            overdueInvoices: decimalToCents(overview.position.overdueInvoices ?? '0'),
           },
           period: {
             income: decimalToCents(overview.period.incomes),
@@ -213,7 +225,7 @@ export function createHttpServices(baseUrl: string): Services {
           creditCards: cards
             .map((card) => toCardSummary(card, accountSummaries))
             .filter((card) => card.creditLimit !== null),
-          latestEntries: latest.slice(0, 5).map(toEntryRow),
+          latestEntries: latest.map(toEntryRow).sort(byDateThenCreatedAt).slice(0, 5),
         }
       },
     },
@@ -234,6 +246,7 @@ export function createHttpServices(baseUrl: string): Services {
           movements: transactions
             .filter((item) => item.paymentMethod !== 'CREDIT')
             .map(toEntryRow)
+            .sort(byDateThenCreatedAt)
             .map((row) => ({
               id: row.id,
               date: row.date,
@@ -280,6 +293,7 @@ export function createHttpServices(baseUrl: string): Services {
         const rows = items
           .map(toEntryRow)
           .filter((row) => (search ? row.description.toLowerCase().includes(search) : true))
+          .sort(byDateThenCreatedAt)
 
         return { items: rows, total: rows.length }
       },
@@ -480,12 +494,25 @@ export function createHttpServices(baseUrl: string): Services {
         const summary = toInvoiceSummary(invoice)
         const transactions = invoice.transactions ?? []
 
+        // Cada quitação, integral ou parcial, é um lançamento da fatura.
+        const paymentRows = transactions
+          .filter((item) => item.type === 'INVOICE_PAYMENT')
+          .map((item) => ({
+            id: item.id,
+            accountId: item.accountId,
+            accountName: item.account?.name ?? invoice.paymentAccount?.name ?? '—',
+            date: item.effectiveDate,
+            amount: decimalToCents(item.amount),
+          }))
+          .sort((a, b) => b.date.localeCompare(a.date))
+
         return {
           ...summary,
           purchases: transactions.filter((item) => item.type === 'EXPENSE').map(toCreditPurchase),
           payments:
-            summary.paid > 0
-              ? [
+            paymentRows.length > 0 || summary.paid <= 0
+              ? paymentRows
+              : [
                   {
                     id: `${invoice.id}-pagamento`,
                     accountId: invoice.paymentAccountId ?? '',
@@ -493,14 +520,16 @@ export function createHttpServices(baseUrl: string): Services {
                     date: invoice.paidAt ?? summary.dueDate,
                     amount: summary.paid,
                   },
-                ]
-              : [],
+                ],
         }
       },
       async registerPayment(input) {
         await http.post<ApiInvoice>(`${ENDPOINTS.invoices}/${input.invoiceId}/payment`, {
           accountId: input.accountId,
           paymentDate: input.date,
+          amount: input.amount === null || input.amount === undefined
+            ? undefined
+            : centsToDecimal(input.amount),
         })
       },
     },
@@ -522,14 +551,18 @@ export function createHttpServices(baseUrl: string): Services {
         return categories.map(toCategoryRow)
       },
       async create(input) {
+        // Sem conta a API cria a categoria disponível em todas elas.
         const category = await http.post<ApiCategory>(ENDPOINTS.categories, {
-          accountId: input.accountId,
+          accountId: input.accountId ?? undefined,
           name: input.name,
         })
         return toCategoryRow(category)
       },
       async rename(id, input) {
-        const category = await http.patch<ApiCategory>(`${ENDPOINTS.categories}/${id}`, input)
+        const category = await http.patch<ApiCategory>(`${ENDPOINTS.categories}/${id}`, {
+          name: input.name,
+          accountId: input.accountId,
+        })
         return toCategoryRow(category)
       },
       async archive(id) {

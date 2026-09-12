@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { PageHeader } from '../../components/layout/PageHeader'
 import { SurfaceCard } from '../../components/ui/Surface'
 import { Breakdown } from '../../components/finance/Breakdown'
+import { PieChart } from '../../components/finance/PieChart'
 import { Money } from '../../components/finance/Money'
 import { EmptyState } from '../../components/ui/States'
 import { Button } from '../../components/ui/Button'
@@ -174,7 +175,13 @@ export function OverviewPage() {
                     label="Faturas em aberto"
                     value={data.position.openInvoices}
                     icon="faturas"
-                    caption="Compras ainda não quitadas"
+                    caption={
+                      data.position.overdueInvoices > 0 ? (
+                        <>Vence neste mês · em atraso: <Money value={data.position.overdueInvoices} /></>
+                      ) : (
+                        'Faturas que vencem neste mês'
+                      )
+                    }
                     tone="negative"
                   />
                 </div>
@@ -212,7 +219,7 @@ export function OverviewPage() {
                   <div className="overview-panel__header">
                     <div>
                       <h2 className="overview-panel__title">Gastos por categoria</h2>
-                      <p className="overview-panel__description">Distribuição dos gastos realizados e previstos</p>
+                      <p className="overview-panel__description">Participação de cada categoria nos gastos do período</p>
                     </div>
                     <strong className="overview-panel__total"><Money value={data.filteredExpenseTotal} /></strong>
                   </div>
@@ -225,7 +232,7 @@ export function OverviewPage() {
                       ))}
                     </SelectField>
                   </div>
-                  <Breakdown label="Gastos por categoria" rows={data.categoryBreakdown} emptyMessage="Nenhum gasto para os filtros selecionados" />
+                  <PieChart label="Gastos por categoria" rows={data.categoryBreakdown} emptyMessage="Nenhum gasto para os filtros selecionados" />
                 </section>
 
                 <section className="overview-panel">

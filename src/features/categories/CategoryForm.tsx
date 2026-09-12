@@ -23,9 +23,10 @@ export function CategoryForm({ categoryId, accountId, onClose }: CategoryFormPro
   const categories = useCategoriesQuery({ accountId: null }, status === 'authenticated')
   const existing = categories.data?.find((category) => category.id === categoryId)
 
+  // Vazio significa "todas as contas", o alcance padrão de uma categoria nova.
   const form = useDrawerForm({
     name: existing?.name ?? '',
-    accountId: existing?.accountId ?? accountId ?? accounts[0]?.id ?? '',
+    accountId: categoryId ? (existing?.accountId ?? '') : (accountId ?? ''),
   })
 
   async function handleSubmit() {
@@ -57,17 +58,20 @@ export function CategoryForm({ categoryId, accountId, onClose }: CategoryFormPro
         onChange={(event) => form.patch({ name: event.target.value })}
       />
       <SelectField
-        label="Conta vinculada"
+        label="Onde a categoria fica disponível"
         value={form.values.accountId}
-        placeholder="Selecione a conta"
+        placeholder="Todas as contas"
         error={form.fieldErrors.accountId}
-        disabled={Boolean(categoryId)}
-        hint="Categorias personalizadas ficam disponíveis apenas nos gastos desta conta."
+        hint={
+          form.values.accountId
+            ? 'Só aparece nos gastos desta conta e dos cartões ligados a ela.'
+            : 'Aparece em qualquer gasto, como as categorias padrão.'
+        }
         onChange={(event) => form.patch({ accountId: event.target.value })}
       >
         {accounts.map((account) => (
           <option key={account.id} value={account.id}>
-            {account.name}
+            Apenas {account.name}
           </option>
         ))}
       </SelectField>

@@ -166,6 +166,7 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
             creditCommitted: credit.committed,
             creditAvailable: credit.available,
             openInvoices: openInvoiceTotal(state, ids, store.today),
+            overdueInvoices: openInvoiceTotal(state, ids, store.today, true),
           },
           period: {
             income,
@@ -185,7 +186,7 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
             .map((account) => toAccountSummary(state, account)),
           creditCards: state.cards
             .filter((card) => ids.includes(card.accountId) && cardHasCredit(card))
-            .map((card) => toCardSummary(state, card)),
+            .map((card) => toCardSummary(state, card, store.today)),
           latestEntries: toEntryRows(state, ids, store.today).slice(0, 5),
         }
       },
@@ -227,7 +228,7 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
           }),
           cards: state.cards
             .filter((card) => card.accountId === id)
-            .map((card) => toCardSummary(state, card)),
+            .map((card) => toCardSummary(state, card, store.today)),
         }
       },
       async create(input) {
@@ -323,7 +324,7 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
         return {
           items: state.cards
             .filter((card) => ids.includes(card.accountId))
-            .map((card) => toCardSummary(state, card)),
+            .map((card) => toCardSummary(state, card, store.today)),
           totals: creditSummary(state, ids),
         }
       },
@@ -333,7 +334,7 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
         if (!card) throw new DataError('Cartão não encontrado.')
 
         return {
-          ...toCardSummary(state, card),
+          ...toCardSummary(state, card, store.today),
           creditPurchases: toCreditPurchases(state, (expenseId) => {
             const expense = state.expenses.find((item) => item.id === expenseId)
             return expense?.cardId === id && expense.method === 'credito'
@@ -355,14 +356,14 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
         const state = store.peek()
         const card = findCard(state, id)
         if (!card) throw new DataError('Cartão não encontrado após a criação.')
-        return toCardSummary(state, card)
+        return toCardSummary(state, card, store.today)
       },
       async update(id, input) {
         await store.updateCard(id, input)
         const state = store.peek()
         const card = findCard(state, id)
         if (!card) throw new DataError('Cartão não encontrado.')
-        return toCardSummary(state, card)
+        return toCardSummary(state, card, store.today)
       },
     },
 
@@ -420,8 +421,8 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
         const category = await store.createCategory(input)
         return toCategoryRow(store.peek(), category)
       },
-      async rename(id, { name }) {
-        const category = await store.renameCategory(id, name)
+      async rename(id, { name, accountId }) {
+        const category = await store.renameCategory(id, name, accountId)
         return toCategoryRow(store.peek(), category)
       },
       archive: (id) => store.archiveCategory(id),

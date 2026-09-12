@@ -6,7 +6,7 @@ import { useScope } from '../../app/contexts'
 import { useAccountScope } from '../../app/useScopeLabel'
 import { useInvoicePaymentMutation, useInvoiceQuery } from '../../services/queries'
 import { useToast } from '../../components/ui/toastContext'
-import { formatAmountInput, formatMoney } from '../../lib/money'
+import { formatAmountInput, formatMoney, parseMoney } from '../../lib/money'
 import { formatDate } from '../../lib/date'
 import { today } from '../../lib/today'
 import { DrawerRecord } from '../shared/DrawerFallback'
@@ -36,21 +36,37 @@ function PaymentFields({ invoice, onClose }: { invoice: InvoiceDetail; onClose: 
   const form = useDrawerForm({
     accountId: accountId ?? accounts[0]?.id ?? '',
     date: today(),
+    amount: formatAmountInput(invoice.remaining),
   })
 
   const source = accounts.find((account) => account.id === form.values.accountId)
   const sourceBalance = source?.currentBalance ?? 0
+  const parsedAmount = parseMoney(form.values.amount)
+  const amount = parsedAmount.ok ? parsedAmount.cents : invoice.remaining
+  const partial = amount > 0 && amount < invoice.remaining
 
   async function handleSubmit() {
+    const errors: Record<string, string> = {}
+    if (!parsedAmount.ok) errors.amount = parsedAmount.reason
+    else if (parsedAmount.cents <= 0) errors.amount = 'Informe um valor maior que zero.'
+    else if (parsedAmount.cents > invoice.remaining) {
+      errors.amount = `O valor não pode passar de ${formatMoney(invoice.remaining)}.`
+    }
+    if (Object.keys(errors).length > 0) {
+      form.setFieldErrors(errors)
+      return
+    }
+
     const ok = await form.submit(() =>
       mutation.mutateAsync({
         invoiceId: invoice.id,
         accountId: form.values.accountId || null,
         date: form.values.date,
+        amount,
       }),
     )
     if (ok) {
-      toast.notify('Pagamento registrado')
+      toast.notify(partial ? 'Pagamento parcial registrado' : 'Pagamento registrado')
       onClose()
     }
   }
@@ -88,17 +104,23 @@ function PaymentFields({ invoice, onClose }: { invoice: InvoiceDetail; onClose: 
 
       {invoice.payable ? null : (
         <InlineAlert tone="warning">
-          Esta fatura não está elegível ao registro de pagamento integral: o ciclo precisa estar
-          fechado e ainda não pago.
+          Esta fatura não tem valor restante para registrar.
         </InlineAlert>
       )}
 
+      {invoice.cycle === 'aberta' ? (
+        <InlineAlert tone="info">
+          O ciclo fecha em {formatDate(invoice.closingDate)}. Você está antecipando o pagamento:
+          compras novas deste ciclo voltam a somar na mesma fatura.
+        </InlineAlert>
+      ) : null}
+
       <MoneyField
         label="Valor do pagamento"
-        value={formatAmountInput(invoice.remaining)}
-        readOnly
-        hint="O fluxo desta versão registra apenas o pagamento integral da fatura."
-        onChange={() => undefined}
+        value={form.values.amount}
+        error={form.fieldErrors.amount}
+        hint={`Restante da fatura: ${formatMoney(invoice.remaining)}. Um valor menor registra pagamento parcial.`}
+        onChange={(value) => form.patch({ amount: value })}
       />
 
       <SelectField
@@ -127,13 +149,19 @@ function PaymentFields({ invoice, onClose }: { invoice: InvoiceDetail; onClose: 
         <div className="drawer__summary-row">
           <dt>Saldo da conta escolhida</dt>
           <dd>
-            {formatMoney(sourceBalance)} → {formatMoney(sourceBalance - invoice.remaining)}
+            {formatMoney(sourceBalance)} → {formatMoney(sourceBalance - amount)}
           </dd>
         </div>
         <div className="drawer__summary-row">
           <dt>Limite do cartão liberado</dt>
-          <dd>{formatMoney(invoice.remaining)}</dd>
+          <dd>{formatMoney(amount)}</dd>
         </div>
+        {partial ? (
+          <div className="drawer__summary-row">
+            <dt>Restante após o pagamento</dt>
+            <dd>{formatMoney(invoice.remaining - amount)}</dd>
+          </div>
+        ) : null}
         <p className="caption text-muted">
           A quitação não cria uma nova despesa: as compras já foram contabilizadas.
         </p>

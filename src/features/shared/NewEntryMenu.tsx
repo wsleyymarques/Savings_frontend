@@ -33,6 +33,14 @@ export function NewEntryMenu({ disabled = false }: { disabled?: boolean }) {
           >
             Novo gasto
           </MenuItem>
+          <MenuItem
+            onClick={() => {
+              close()
+              drawer.open({ kind: 'compromisso' })
+            }}
+          >
+            Novo compromisso
+          </MenuItem>
         </>
       )}
     </DropdownMenu>

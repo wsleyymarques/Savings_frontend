@@ -426,3 +426,26 @@
 @media (max-width: 640px) {
   .planning-stats { grid-template-columns: 1fr; }
 }
+
+/* ------------------ Fatura do ciclo aberto no cartão (REQ-6) ---------------- */
+.card-tile__invoice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-panel);
+  background: var(--color-surface-hover);
+}
+.card-tile__invoice-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.card-tile__invoice-label {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.card-tile__invoice-value { font-size: 18px; line-height: 24px; font-variant-numeric: tabular-nums; }

@@ -422,11 +422,12 @@ export class MockStore {
     const name = input.name.trim()
     const fields: Record<string, string> = {}
     if (name.length < 1 || name.length > 60) fields.name = 'Informe um nome de 1 a 60 caracteres.'
-    if (!input.accountId || !findAccount(this.state, input.accountId)) {
-      fields.accountId = 'Selecione a conta da categoria.'
+    // Sem conta a categoria vale em todas as contas do usuário.
+    if (input.accountId && !findAccount(this.state, input.accountId)) {
+      fields.accountId = 'Selecione uma conta válida.'
     }
-    if (!fields.name && input.accountId && this.hasCategoryName(name, input.accountId, null)) {
-      fields.name = 'Já existe uma categoria com este nome nesta conta.'
+    if (!fields.name && this.hasCategoryName(name, input.accountId, null)) {
+      fields.name = 'Já existe uma categoria disponível com este nome.'
     }
     if (Object.keys(fields).length > 0) throw new ValidationError(fields)
 
@@ -435,7 +436,7 @@ export class MockStore {
       name,
       origin: 'personalizada',
       ownerId,
-      accountId: input.accountId as Id,
+      accountId: input.accountId ?? null,
       archived: false,
     }
     this.state = { ...this.state, categories: [...this.state.categories, category] }
@@ -443,7 +444,7 @@ export class MockStore {
     return category
   }
 
-  async renameCategory(id: Id, name: string): Promise<Category> {
+  async renameCategory(id: Id, name: string, accountId?: Id | null): Promise<Category> {
     await this.write()
     this.requireUser()
     const category = findCategory(this.state, id)
@@ -451,14 +452,18 @@ export class MockStore {
       throw new DataError('Categorias padrão não podem ser alteradas.')
     }
     const trimmed = name.trim()
+    const nextAccountId = accountId === undefined ? category.accountId : accountId
     const fields: Record<string, string> = {}
     if (trimmed.length < 1 || trimmed.length > 60) fields.name = 'Informe um nome de 1 a 60 caracteres.'
-    else if (this.hasCategoryName(trimmed, category.accountId as Id, id)) {
-      fields.name = 'Já existe uma categoria com este nome nesta conta.'
+    else if (this.hasCategoryName(trimmed, nextAccountId, id)) {
+      fields.name = 'Já existe uma categoria disponível com este nome.'
+    }
+    if (nextAccountId && !findAccount(this.state, nextAccountId)) {
+      fields.accountId = 'Selecione uma conta válida.'
     }
     if (Object.keys(fields).length > 0) throw new ValidationError(fields)
 
-    const updated = { ...category, name: trimmed }
+    const updated = { ...category, name: trimmed, accountId: nextAccountId }
     this.state = {
       ...this.state,
       categories: this.state.categories.map((item) => (item.id === id ? updated : item)),
@@ -483,9 +488,13 @@ export class MockStore {
     this.persist()
   }
 
-  private hasCategoryName(name: string, accountId: Id, ignoreId: Id | null): boolean {
+  /** Conflita com o que já pode ser escolhido no mesmo gasto. */
+  private hasCategoryName(name: string, accountId: Id | null, ignoreId: Id | null): boolean {
     const normalized = normalizeCategoryName(name)
-    return selectableCategories(this.state, accountId).some(
+    const candidates = accountId
+      ? selectableCategories(this.state, accountId)
+      : this.state.categories.filter((category) => !category.archived)
+    return candidates.some(
       (category) => category.id !== ignoreId && normalizeCategoryName(category.name) === normalized,
     )
   }
@@ -505,9 +514,11 @@ export class MockStore {
     }
     if (!isValidCivilDate(input.date)) fields.date = 'Informe uma data válida.'
     if (totals.remaining <= 0) throw new DataError('Esta fatura já está paga.')
-    if (totals.cycle !== 'fechada') {
-      throw new DataError('O pagamento integral é registrado após o fechamento da fatura.')
-    }
+    // Sem valor informado, o registro quita o restante; a antecipação de uma
+    // fatura ainda aberta é permitida.
+    const amount = input.amount ?? totals.remaining
+    if (amount <= 0) fields.amount = 'Informe um valor maior que zero.'
+    if (amount > totals.remaining) fields.amount = 'O valor excede o restante da fatura.'
     if (Object.keys(fields).length > 0) throw new ValidationError(fields)
 
     this.state = {
@@ -519,7 +530,7 @@ export class MockStore {
           ownerId,
           invoiceId: invoice.id,
           accountId: input.accountId as Id,
-          amount: totals.remaining,
+          amount,
           date: input.date,
         },
       ],
