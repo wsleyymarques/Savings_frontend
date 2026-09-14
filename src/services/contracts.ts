@@ -166,9 +166,9 @@ export interface OverviewSummary {
     creditLimit: Cents
     creditCommitted: Cents
     creditAvailable: Cents
-    /** Faturas que vencem até o fim do mês corrente, mais as já vencidas. */
+    /** Saldo das faturas cujos ciclos ainda estão abertos. */
     openInvoices: Cents
-    /** Parcela do valor acima que já passou do vencimento. */
+    /** Saldo das faturas não pagas que já passaram do vencimento. */
     overdueInvoices: Cents
   }
   period: {

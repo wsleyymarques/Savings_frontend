@@ -3,7 +3,6 @@ import {
   addMonths,
   compareDateDesc,
   daysInMonth,
-  endOfMonth,
   isWithin,
   monthLabelFrom,
   toCivilDate,
@@ -169,25 +168,37 @@ export function invoiceTotals(state: FinanceState, invoice: Invoice, today: Civi
   }
 }
 
-/**
- * "Faturas em aberto" é o caixa do mês, não o crédito comprometido do cartão:
- * entra o que vence até o fim do mês corrente somado ao que já venceu e segue
- * sem pagamento. `onlyOverdue` isola a parcela atrasada para a legenda.
- */
+/** Soma o saldo das faturas cujos ciclos ainda recebem compras. */
 export function openInvoiceTotal(
   state: FinanceState,
   accountIds: Id[],
   today: CivilDate,
-  onlyOverdue = false,
+): Cents {
+  return sum(
+    state.cards
+      .filter((card) => accountIds.includes(card.accountId) && cardHasCredit(card))
+      .map((card) => {
+        const currentCycle = resolveInvoiceCycle(card, today)
+        const invoice = state.invoices.find(
+          (item) => item.cardId === card.id && item.closingDate === currentCycle.closingDate,
+        )
+        return invoice ? invoiceTotals(state, invoice, today).remaining : 0
+      }),
+  )
+}
+
+/** Soma o saldo das faturas não pagas que já venceram. */
+export function overdueInvoiceTotal(
+  state: FinanceState,
+  accountIds: Id[],
+  today: CivilDate,
 ): Cents {
   const cardIds = state.cards
     .filter((card) => accountIds.includes(card.accountId))
     .map((card) => card.id)
-  const limit = onlyOverdue ? today : endOfMonth(today)
   return sum(
     state.invoices
-      .filter((invoice) => cardIds.includes(invoice.cardId))
-      .filter((invoice) => (onlyOverdue ? invoice.dueDate < limit : invoice.dueDate <= limit))
+      .filter((invoice) => cardIds.includes(invoice.cardId) && invoice.dueDate < today)
       .map((invoice) => invoiceTotals(state, invoice, today).remaining),
   )
 }

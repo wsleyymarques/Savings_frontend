@@ -175,13 +175,7 @@ export function OverviewPage() {
                     label="Faturas em aberto"
                     value={data.position.openInvoices}
                     icon="faturas"
-                    caption={
-                      data.position.overdueInvoices > 0 ? (
-                        <>Vence neste mês · em atraso: <Money value={data.position.overdueInvoices} /></>
-                      ) : (
-                        'Faturas que vencem neste mês'
-                      )
-                    }
+                    caption="Ciclos atuais que ainda não fecharam"
                     tone="negative"
                   />
                 </div>

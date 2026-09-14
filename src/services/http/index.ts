@@ -201,7 +201,7 @@ export function createHttpServices(baseUrl: string): Services {
             creditCommitted: decimalToCents(overview.position.committedCredit),
             creditAvailable: decimalToCents(overview.position.availableCredit),
             openInvoices: decimalToCents(
-              overview.position.invoicesDueThisMonth ?? overview.position.unpaidInvoices,
+              overview.position.openInvoices ?? overview.position.unpaidInvoices,
             ),
             overdueInvoices: decimalToCents(overview.position.overdueInvoices ?? '0'),
           },

@@ -9,6 +9,7 @@ import {
   creditSummary,
   findCard,
   openInvoiceTotal,
+  overdueInvoiceTotal,
   paymentBreakdown,
   selectableCategories,
   totalBalance,
@@ -166,7 +167,7 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
             creditCommitted: credit.committed,
             creditAvailable: credit.available,
             openInvoices: openInvoiceTotal(state, ids, store.today),
-            overdueInvoices: openInvoiceTotal(state, ids, store.today, true),
+            overdueInvoices: overdueInvoiceTotal(state, ids, store.today),
           },
           period: {
             income,

@@ -137,6 +137,7 @@ export interface ApiOverview {
     committedCredit: string
     availableCredit: string
     unpaidInvoices: string
+    openInvoices?: string
     invoicesDueThisMonth?: string
     overdueInvoices?: string
   }
