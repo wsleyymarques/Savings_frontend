@@ -5,6 +5,7 @@ import { SurfaceCard } from '../../components/ui/Surface'
 import { SelectField } from '../../components/ui/Field'
 import { Badge } from '../../components/ui/Badge'
 import { Money } from '../../components/finance/Money'
+import { StatCard } from '../../components/finance/StatCard'
 import { Button } from '../../components/ui/Button'
 import { EmptyState } from '../../components/ui/States'
 import { useDrawer, useScope, useSession } from '../../app/contexts'
@@ -43,8 +44,16 @@ export function InvoicesPage() {
       <PageHeader title="Faturas" description={`Ciclos de crédito · ${scopeLabel}`} />
 
       <QueryBoundary query={invoices} rows={3}>
-        {(items) =>
-          creditCards.length === 0 && items.length === 0 ? (
+        {(items) => {
+          const unpaidInvoices = items.filter(
+            (invoice) => invoice.payment === 'nao-paga' && invoice.remaining > 0,
+          )
+          const totalToPay = unpaidInvoices.reduce(
+            (total, invoice) => total + invoice.remaining,
+            0,
+          )
+
+          return creditCards.length === 0 && items.length === 0 ? (
             <SurfaceCard>
               <EmptyState
                 icon="faturas"
@@ -74,9 +83,9 @@ export function InvoicesPage() {
                     ))}
                   </SelectField>
                   <SelectField
-                    label="Ciclo"
+                    label="Mês da fatura"
                     value={cycleMonth}
-                    placeholder="Todos os ciclos"
+                    placeholder="Todos os meses"
                     onChange={(event) => setCycleMonth(event.target.value)}
                   >
                     {cycles.map(([month, label]) => (
@@ -87,6 +96,17 @@ export function InvoicesPage() {
                   </SelectField>
                 </div>
               </SurfaceCard>
+
+              <div className="grid grid--stats">
+                <StatCard
+                  label="Total a pagar"
+                  value={totalToPay}
+                  caption={`${unpaidInvoices.length} ${
+                    unpaidInvoices.length === 1 ? 'fatura não paga' : 'faturas não pagas'
+                  } nos filtros atuais`}
+                  highlight
+                />
+              </div>
 
               {items.length === 0 ? (
                 <SurfaceCard>
@@ -140,7 +160,7 @@ export function InvoicesPage() {
                           <span className="invoice-summary__value">{formatDate(invoice.dueDate)}</span>
                         </div>
                         <div className="invoice-summary__item">
-                          <span className="invoice-summary__label">Total de compras</span>
+                          <span className="invoice-summary__label">Valor da fatura</span>
                           <span className="invoice-summary__value">
                             <Money value={invoice.total} />
                           </span>
@@ -178,7 +198,7 @@ export function InvoicesPage() {
               )}
             </>
           )
-        }
+        }}
       </QueryBoundary>
     </>
   )
