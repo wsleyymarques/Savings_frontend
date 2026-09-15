@@ -270,6 +270,9 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
             return expense?.categoryId === params.categoryId
           })
           .filter((row) => (params.method ? row.method === params.method : true))
+          .filter((row) =>
+            params.expenseMode ? (row.expenseMode ?? 'unica') === params.expenseMode : true,
+          )
 
         return { items, total: items.length }
       },
