@@ -814,6 +814,10 @@ export function createHttpServices(baseUrl: string): Services {
       async day(date) {
         return toHabitDay(await http.get<ApiHabitDay>(`${ENDPOINTS.habits}/day/${date}`))
       },
+      async range(from, to) {
+        const days = await http.get<ApiHabitDay[]>(`${ENDPOINTS.habits}/range`, { from, to })
+        return days.map(toHabitDay)
+      },
       async addItem(date, input) {
         await http.post(`${ENDPOINTS.habits}/day/${date}/items`, {
           ...input,
@@ -931,6 +935,7 @@ function habitPayload(input: import('../contracts').HabitInput) {
     measurementType: HABIT_MEASUREMENT_TO_API[input.measurementType],
     unit: input.unit ?? undefined,
     defaultDailyTarget: input.defaultDailyTarget.toFixed(2),
+    weeklyTarget: input.weeklyTarget,
   }
 }
 

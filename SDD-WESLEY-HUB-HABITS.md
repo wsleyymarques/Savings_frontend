@@ -76,7 +76,7 @@ Hoje a sidebar mistura “Finanças” e “Metas” como se fossem aplicações
 | HAB-09 | Confirmado | Suportar metas recorrentes como “academia no mínimo 3 vezes por semana”. |
 | HAB-10 | Confirmado | Ajudar a relacionar a rotina diária com objetivos de longo prazo. |
 | HAB-11 | Adotado | Permitir várias sessões do mesmo hábito no mesmo dia. |
-| HAB-12 | Proposto | Permitir planejamento semanal copiando hábitos para dias específicos. |
+| HAB-12 | Adotado | Permitir planejamento semanal copiando hábitos para dias específicos por meio do `+` diário. |
 
 ## 4. Arquitetura do produto
 
@@ -188,6 +188,7 @@ O módulo Metas conhece apenas a interface e o tipo normalizado. Ele não conhec
 | `measurementType` | enum | `check`, `count` ou `duration`. |
 | `unit` | texto | Ex.: vezes, páginas, minutos. Derivada em `check` e `duration`. |
 | `defaultDailyTarget` | decimal | Opcional; ex.: 120 minutos de estudo. |
+| `weeklyTarget` | inteiro de 1 a 99 | Frequência desejada, ex.: três conclusões por semana. |
 | `active` | booleano | Hábitos arquivados preservam o histórico. |
 
 Regras:
@@ -195,6 +196,7 @@ Regras:
 - `check` representa feito ou não feito e gera valor 1 ao marcar.
 - `count` soma quantidades, como páginas, copos ou séries.
 - `duration` usa minutos como unidade canônica na persistência e converte para horas na exibição.
+- A frequência semanal e o objetivo por execução são parâmetros diferentes: Academia pode ser 3 vezes por semana com uma conclusão por execução; Estudar pode ser 5 vezes por semana com 120 minutos por execução.
 - Alterar nome, cor ou alvo padrão não reescreve itens e registros históricos.
 - Arquivar impede novos planejamentos, mas não remove estatísticas nem progresso passado.
 
@@ -388,7 +390,7 @@ Itens `skipped` permanecem no denominador da aderência. Dias sem nenhum item pl
 | Rota | Tela | Conteúdo |
 | --- | --- | --- |
 | `/habits/hoje` | Hoje | Checklist, progresso do dia, ação rápida para atividade avulsa e hábitos reutilizáveis. |
-| `/habits/rotina` | Rotina | Hábitos cadastrados, planejamento da semana e agenda dos próximos dias. |
+| `/habits/rotina` | Rotina | Hábitos cadastrados, frequência desejada, progresso semanal e agenda dos próximos dias com ação `+` por dia. |
 | `/habits/estatisticas` | Estatísticas | Aderência, frequência, tempo investido, sequências e comparação por período. |
 | `/habits/metas` | Metas | Ciclos anuais, semestrais, trimestrais e personalizados. |
 | `/habits/metas/:id` | Ciclo | Objetivos, vínculos com hábitos, atingimento, erro e contribuição. |
@@ -485,6 +487,7 @@ Todas as rotas exigem autenticação e usam o usuário da sessão.
 | POST | `/api/v1/habits` | Cria hábito reutilizável. |
 | PATCH | `/api/v1/habits/:id` | Edita ou arquiva hábito. |
 | GET | `/api/v1/habits/day/:date` | Devolve checklist e resumo do dia. |
+| GET | `/api/v1/habits/range?from&to` | Devolve os dias e itens de uma janela curta para a visão semanal. |
 | POST | `/api/v1/habits/day/:date/items` | Cria item avulso ou a partir de hábito. |
 | PATCH | `/api/v1/habits/items/:id` | Altera alvo, ordem, data ou estado do item. |
 | DELETE | `/api/v1/habits/items/:id` | Remove item sem execução; com execução exige exclusão explícita dos registros. |

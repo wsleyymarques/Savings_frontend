@@ -397,11 +397,54 @@
   min-width: 100px;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
   gap: var(--space-2);
   padding: var(--space-3);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-control);
+}
+.habit-day-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+.habit-day-card__date {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.habit-day-add {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  color: var(--color-action);
+}
+.habit-day-card__empty {
+  min-height: 40px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+.habit-day-items {
+  min-height: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.habit-day-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  font-size: 12px;
+  line-height: 16px;
+  overflow-wrap: anywhere;
+}
+.habit-day-item--done {
+  color: var(--color-success-text);
 }
 
 /* ---------------------------- Lançamentos --------------------------------- */

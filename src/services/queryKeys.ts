@@ -106,6 +106,7 @@ export const queryKeys = {
     all: ['habits'] as const,
     list: ['habits', 'lista'] as const,
     day: (date: string) => ['habits', 'dia', date] as const,
+    range: (from: string, to: string) => ['habits', 'intervalo', from, to] as const,
     stats: (from: string, to: string, habitId?: Id) =>
       ['habits', 'estatisticas', from, to, habitId ?? 'todos'] as const,
   },

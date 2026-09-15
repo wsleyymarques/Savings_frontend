@@ -30,15 +30,20 @@ function HabitFields({ habit, onClose }: { habit?: HabitDefinition; onClose: () 
     measurementType: habit?.measurementType ?? ('check' as HabitMeasurementType),
     unit: habit?.unit ?? '',
     target: String(habit?.defaultDailyTarget ?? 1),
+    weeklyTarget: String(habit?.weeklyTarget ?? 3),
   })
   const measurement = form.values.measurementType
 
   async function submit() {
     const target = measurement === 'check' ? 1 : Number(form.values.target.replace(',', '.'))
+    const weeklyTarget = Number(form.values.weeklyTarget)
     const errors: Record<string, string> = {}
     if (!form.values.name.trim()) errors.name = 'Informe o nome do hábito.'
     if (measurement !== 'check' && (!Number.isFinite(target) || target <= 0)) {
       errors.target = 'Informe um alvo maior que zero.'
+    }
+    if (!Number.isInteger(weeklyTarget) || weeklyTarget < 1 || weeklyTarget > 99) {
+      errors.weeklyTarget = 'Informe um número inteiro entre 1 e 99.'
     }
     if (Object.keys(errors).length) {
       form.setFieldErrors(errors)
@@ -52,6 +57,7 @@ function HabitFields({ habit, onClose }: { habit?: HabitDefinition; onClose: () 
         measurementType: measurement,
         unit: measurement === 'contagem' ? form.values.unit.trim() || 'vezes' : null,
         defaultDailyTarget: target,
+        weeklyTarget,
       }),
     )
     if (ok) {
@@ -76,9 +82,20 @@ function HabitFields({ habit, onClose }: { habit?: HabitDefinition; onClose: () 
         <option value="contagem">Quantidade</option>
         <option value="duracao">Duração</option>
       </SelectField>
+      <TextField
+        label="Repetições por semana"
+        value={form.values.weeklyTarget}
+        error={form.fieldErrors.weeklyTarget}
+        type="number"
+        min={1}
+        max={99}
+        step={1}
+        hint="Quantas vezes você quer concluir este hábito em uma semana."
+        onChange={(event) => form.patch({ weeklyTarget: event.target.value })}
+      />
       {measurement === 'check' ? null : (
         <TextField
-          label={measurement === 'duracao' ? 'Alvo diário em minutos' : 'Alvo diário'}
+          label={measurement === 'duracao' ? 'Objetivo por execução em minutos' : 'Objetivo por execução'}
           value={form.values.target}
           error={form.fieldErrors.target}
           inputMode="decimal"

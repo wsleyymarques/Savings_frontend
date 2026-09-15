@@ -876,6 +876,9 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
       async create(input) {
         const name = input.name.trim()
         if (!name) throw new DataError('Informe o nome do hábito.')
+        if (!Number.isInteger(input.weeklyTarget) || input.weeklyTarget < 1 || input.weeklyTarget > 99) {
+          throw new DataError('Informe repetições semanais entre 1 e 99.')
+        }
         const habit: HabitDefinition = {
           id: crypto.randomUUID(),
           ...input,
@@ -896,6 +899,9 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
       async update(id, input) {
         const habit = habits.find((candidate) => candidate.id === id)
         if (!habit) throw new DataError('Hábito não encontrado.')
+        if (!Number.isInteger(input.weeklyTarget) || input.weeklyTarget < 1 || input.weeklyTarget > 99) {
+          throw new DataError('Informe repetições semanais entre 1 e 99.')
+        }
         Object.assign(habit, input, {
           name: input.name.trim(),
           unit:
@@ -909,6 +915,9 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
       },
       async day(date) {
         return mockHabitDay(date, habitItems)
+      },
+      async range(from, to) {
+        return datesBetween(from, to).map((date) => mockHabitDay(date, habitItems))
       },
       async addItem(date, input) {
         const habit = input.habitId
@@ -1002,6 +1011,17 @@ function mockHabitDay(date: string, items: HabitDailyItem[]) {
     completionRate: selected.length ? (completed / selected.length) * 100 : 0,
     items: selected,
   }
+}
+
+function datesBetween(from: string, to: string): string[] {
+  const cursor = new Date(`${from}T00:00:00Z`)
+  const last = new Date(`${to}T00:00:00Z`)
+  const dates: string[] = []
+  while (cursor <= last) {
+    dates.push(cursor.toISOString().slice(0, 10))
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return dates
 }
 
 function mockHabitStats(from: string, to: string, items: HabitDailyItem[]): HabitStats {

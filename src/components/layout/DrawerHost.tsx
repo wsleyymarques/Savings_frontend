@@ -92,7 +92,7 @@ export function DrawerHost() {
     case 'habito':
       return <HabitForm key={`habito-${request.id ?? 'novo'}`} habitId={request.id} onClose={close} />
     case 'item-habito':
-      return <HabitItemForm key={`item-habito-${request.date}`} date={request.date} onClose={close} />
+      return <HabitItemForm key={`item-habito-${request.date}`} date={request.date} preferExisting={request.preferExisting} onClose={close} />
     case 'registro-habito':
       return <HabitRecordForm key={`registro-habito-${request.item.id}`} item={request.item} onClose={close} />
     case 'pagar-compromisso':

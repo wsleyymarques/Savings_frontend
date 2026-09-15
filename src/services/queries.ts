@@ -529,6 +529,14 @@ export function useHabitDayQuery(date: string, enabled = true) {
   })
 }
 
+export function useHabitRangeQuery(from: string, to: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.habits.range(from, to),
+    queryFn: () => services.habits.range(from, to),
+    enabled: enabled && Boolean(from && to),
+  })
+}
+
 export function useHabitStatsQuery(from: string, to: string, habitId?: Id) {
   return useQuery({
     queryKey: queryKeys.habits.stats(from, to, habitId),

@@ -66,7 +66,7 @@ export type DrawerRequest =
   | { kind: 'objetivo-meta'; cycleId: Id; id?: Id }
   | { kind: 'progresso-meta'; objectiveId: Id }
   | { kind: 'habito'; id?: Id }
-  | { kind: 'item-habito'; date: string }
+  | { kind: 'item-habito'; date: string; preferExisting?: boolean }
   | { kind: 'registro-habito'; item: HabitDailyItem }
 
 export interface DrawerValue {

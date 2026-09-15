@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { FormDrawer } from '../../components/layout/FormDrawer'
 import { SelectField, TextField } from '../../components/ui/Field'
 import { useToast } from '../../components/ui/toastContext'
@@ -5,7 +6,7 @@ import type { HabitMeasurementType } from '../../services'
 import { useHabitItemMutation, useHabitsQuery } from '../../services/queries'
 import { useDrawerForm } from '../shared/useDrawerForm'
 
-export function HabitItemForm({ date, onClose }: { date: string; onClose: () => void }) {
+export function HabitItemForm({ date, preferExisting = false, onClose }: { date: string; preferExisting?: boolean; onClose: () => void }) {
   const habits = useHabitsQuery()
   const mutation = useHabitItemMutation(date)
   const toast = useToast()
@@ -16,6 +17,21 @@ export function HabitItemForm({ date, onClose }: { date: string; onClose: () => 
     target: '1',
     unit: '',
   })
+  const initializedExistingHabit = useRef(false)
+  const formValues = form.values
+  const replaceForm = form.replace
+  useEffect(() => {
+    if (initializedExistingHabit.current || !preferExisting || habits.data === undefined) return
+    initializedExistingHabit.current = true
+    const firstHabit = habits.data?.[0]
+    if (firstHabit) {
+      replaceForm({
+        ...formValues,
+        source: firstHabit.id,
+        target: String(firstHabit.defaultDailyTarget),
+      })
+    }
+  }, [formValues, habits.data, preferExisting, replaceForm])
   const selected = habits.data?.find((habit) => habit.id === form.values.source)
   const measurement = selected?.measurementType ?? form.values.measurementType
 

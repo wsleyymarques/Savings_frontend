@@ -363,6 +363,7 @@ export interface ApiHabitDefinition {
   measurementType: ApiHabitMeasurementType
   unit: string | null
   defaultDailyTarget: string
+  weeklyTarget: number
   active: boolean
 }
 

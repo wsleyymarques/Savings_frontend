@@ -562,6 +562,7 @@ export interface HabitDefinition {
   measurementType: HabitMeasurementType
   unit: string | null
   defaultDailyTarget: number
+  weeklyTarget: number
   active: boolean
 }
 
@@ -572,6 +573,7 @@ export interface HabitInput {
   measurementType: HabitMeasurementType
   unit: string | null
   defaultDailyTarget: number
+  weeklyTarget: number
 }
 
 export interface HabitActivityRecord {
@@ -756,6 +758,7 @@ export interface HabitsService {
   create(input: HabitInput): Promise<Id>
   update(id: Id, input: HabitInput & { active?: boolean }): Promise<void>
   day(date: CivilDate): Promise<HabitDay>
+  range(from: CivilDate, to: CivilDate): Promise<HabitDay[]>
   addItem(date: CivilDate, input: HabitDailyItemInput): Promise<void>
   updateItem(id: Id, input: { state?: HabitItemState; plannedOn?: CivilDate; targetValue?: number }): Promise<void>
   deleteItem(id: Id): Promise<void>
