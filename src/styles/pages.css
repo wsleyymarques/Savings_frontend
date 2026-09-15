@@ -354,6 +354,56 @@
 .item-row__value { font-variant-numeric: tabular-nums; font-weight: 600; text-align: right; }
 .item-row__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 
+/* -------------------------------- Habits ---------------------------------- */
+.habit-date-filter,
+.period-fields {
+  display: flex;
+  align-items: end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-6);
+}
+.habit-date-filter .field,
+.period-fields .field { min-width: 180px; }
+.habit-check {
+  width: 24px;
+  height: 24px;
+  accent-color: var(--color-action);
+  cursor: pointer;
+}
+.habit-progress-dot {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--color-border-strong);
+  border-radius: 50%;
+  color: var(--color-success-text);
+  font-weight: 700;
+}
+.habit-item--skipped { opacity: .65; }
+.habit-color {
+  width: 12px;
+  height: 36px;
+  border-radius: 999px;
+}
+.habit-week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(100px, 1fr));
+  gap: var(--space-3);
+  overflow-x: auto;
+}
+.habit-day-card {
+  min-width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+}
+
 /* ---------------------------- Lançamentos --------------------------------- */
 .entries-dashboard {
   display: flex;

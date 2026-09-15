@@ -19,6 +19,9 @@ import type {
   ApiGoalCycleRow,
   ApiGoalObjective,
   ApiGoalProgressEntry,
+  ApiHabitDay,
+  ApiHabitDefinition,
+  ApiHabitStats,
 } from './apiTypes'
 import {
   centsToDecimal,
@@ -43,6 +46,9 @@ import type {
   GoalCycleInput,
   GoalCycleSummary,
   GoalObjectiveInput,
+  HabitDailyItem,
+  HabitDefinition,
+  HabitStats,
   InvoiceDetail,
   OverviewSummary,
   ScopeParams,
@@ -82,6 +88,7 @@ export const ENDPOINTS = {
   goalCycles: '/goals/cycles',
   goalObjectives: '/goals/objectives',
   goalProgress: '/goals/progress',
+  habits: '/habits',
   health: '/health',
 } as const
 
@@ -786,6 +793,144 @@ export function createHttpServices(baseUrl: string): Services {
         await http.delete<void>(`${ENDPOINTS.goalProgress}/${id}`)
       },
     },
+
+    habits: {
+      async list(includeArchived = false) {
+        const rows = await http.get<ApiHabitDefinition[]>(ENDPOINTS.habits, {
+          includeArchived: includeArchived ? 'true' : undefined,
+        })
+        return rows.map(toHabitDefinition)
+      },
+      async create(input) {
+        const row = await http.post<ApiHabitDefinition>(ENDPOINTS.habits, habitPayload(input))
+        return row.id
+      },
+      async update(id, input) {
+        await http.patch(`${ENDPOINTS.habits}/${id}`, {
+          ...habitPayload(input),
+          active: input.active,
+        })
+      },
+      async day(date) {
+        return toHabitDay(await http.get<ApiHabitDay>(`${ENDPOINTS.habits}/day/${date}`))
+      },
+      async addItem(date, input) {
+        await http.post(`${ENDPOINTS.habits}/day/${date}/items`, {
+          ...input,
+          measurementType: input.measurementType
+            ? HABIT_MEASUREMENT_TO_API[input.measurementType]
+            : undefined,
+          targetValue: input.targetValue?.toFixed(2),
+        })
+      },
+      async updateItem(id, input) {
+        await http.patch(`${ENDPOINTS.habits}/items/${id}`, {
+          ...input,
+          state:
+            input.state === undefined
+              ? undefined
+              : input.state === 'ignorado'
+                ? 'SKIPPED'
+                : 'PLANNED',
+          targetValue: input.targetValue?.toFixed(2),
+        })
+      },
+      async deleteItem(id) {
+        await http.delete(`${ENDPOINTS.habits}/items/${id}`)
+      },
+      async addRecord(itemId, input) {
+        await http.post(`${ENDPOINTS.habits}/items/${itemId}/records`, {
+          value: input.value?.toFixed(2),
+          startedAt: input.startedAt,
+          endedAt: input.endedAt,
+          note: input.note ?? undefined,
+        })
+      },
+      async deleteRecord(id) {
+        await http.delete(`${ENDPOINTS.habits}/records/${id}`)
+      },
+      async stats(from, to, habitId) {
+        return toHabitStats(
+          await http.get<ApiHabitStats>(`${ENDPOINTS.habits}/stats`, { from, to, habitId }),
+        )
+      },
+    },
+  }
+}
+
+const HABIT_MEASUREMENT_TO_API = {
+  check: 'CHECK',
+  contagem: 'COUNT',
+  duracao: 'DURATION',
+} as const
+
+const HABIT_MEASUREMENT_FROM_API = {
+  CHECK: 'check',
+  COUNT: 'contagem',
+  DURATION: 'duracao',
+} as const
+
+function toHabitDefinition(row: ApiHabitDefinition): HabitDefinition {
+  return {
+    ...row,
+    measurementType: HABIT_MEASUREMENT_FROM_API[row.measurementType],
+    defaultDailyTarget: Number(row.defaultDailyTarget),
+  }
+}
+
+function toHabitItem(item: ApiHabitDay['items'][number]): HabitDailyItem {
+  return {
+    id: item.id,
+    plannedOn: item.plannedOn,
+    habitId: item.habitId,
+    title: item.title,
+    measurementType: HABIT_MEASUREMENT_FROM_API[item.measurementType],
+    targetValue: Number(item.targetValue),
+    currentValue: Number(item.currentValue),
+    unit: item.unit,
+    position: item.position,
+    state: item.state === 'SKIPPED' ? 'ignorado' : 'planejado',
+    completed: item.completed,
+    records: item.records.map((record) => ({
+      ...record,
+      value: Number(record.value),
+    })),
+  }
+}
+
+function toHabitDay(day: ApiHabitDay) {
+  return {
+    date: day.date,
+    planned: day.planned,
+    completed: day.completed,
+    completionRate: Number(day.completionRate),
+    items: day.items.map(toHabitItem),
+  }
+}
+
+function toHabitStats(stats: ApiHabitStats): HabitStats {
+  return {
+    ...stats,
+    adherence: Number(stats.adherence),
+    durationMinutes: Number(stats.durationMinutes),
+    countValue: Number(stats.countValue),
+    habits: stats.habits.map((habit) => ({
+      ...habit,
+      adherence: Number(habit.adherence),
+      durationMinutes: Number(habit.durationMinutes),
+      countValue: Number(habit.countValue),
+    })),
+  }
+}
+
+function habitPayload(input: import('../contracts').HabitInput) {
+  return {
+    name: input.name,
+    description: input.description ?? undefined,
+    color: input.color ?? undefined,
+    measurementType: HABIT_MEASUREMENT_TO_API[input.measurementType],
+    unit: input.unit ?? undefined,
+    defaultDailyTarget: input.defaultDailyTarget.toFixed(2),
   }
 }
 
@@ -946,6 +1091,37 @@ const OBJECTIVE_STATUS_FROM_API = {
   ABANDONED: 'abandonado',
 } as const
 
+const CYCLE_TYPE_FROM_API = {
+  CUSTOM: 'personalizado',
+  ANNUAL: 'anual',
+  SEMESTER: 'semestral',
+  QUARTER: 'trimestral',
+} as const
+
+const CYCLE_TYPE_TO_API = {
+  personalizado: 'CUSTOM',
+  anual: 'ANNUAL',
+  semestral: 'SEMESTER',
+  trimestral: 'QUARTER',
+} as const
+
+const GOAL_AGGREGATION_TO_API = {
+  'dias-concluidos': 'COMPLETED_DAYS',
+  ocorrencias: 'OCCURRENCES',
+  soma: 'SUM',
+  duracao: 'DURATION',
+} as const
+
+const GOAL_AGGREGATION_FROM_API = {
+  COMPLETED_DAYS: 'dias-concluidos',
+  OCCURRENCES: 'ocorrencias',
+  SUM: 'soma',
+  DURATION: 'duracao',
+} as const
+
+const GOAL_CADENCE_TO_API = { diaria: 'DAILY', semanal: 'WEEKLY', mensal: 'MONTHLY' } as const
+const GOAL_CADENCE_FROM_API = { DAILY: 'diaria', WEEKLY: 'semanal', MONTHLY: 'mensal' } as const
+
 function toCycleSummary(
   cycle: import('./apiTypes').ApiGoalCycle,
   summary: import('./apiTypes').ApiGoalSummary,
@@ -964,6 +1140,8 @@ function toCycleSummary(
     withinMargin: summary.withinMargin,
     elapsedFraction: Number(summary.elapsedFraction),
     objectiveCount: summary.objectiveCount,
+    cycleType: CYCLE_TYPE_FROM_API[cycle.cycleType],
+    parentCycleId: cycle.parentCycleId,
   }
 }
 
@@ -986,6 +1164,12 @@ function toCycleDetail(result: ApiGoalCycleResult): GoalCycleDetail {
       errorPercent: Number(objective.errorPercent),
       withinMargin: objective.withinMargin,
       status: OBJECTIVE_STATUS_FROM_API[objective.status],
+      sourceType: objective.sourceType === 'HABITS' ? 'habits' : 'manual',
+      evaluationMode: objective.evaluationMode === 'RECURRING' ? 'recorrente' : 'total',
+      cadence: objective.cadence ? GOAL_CADENCE_FROM_API[objective.cadence] : null,
+      currentWindow: objective.currentWindow
+        ? { actual: Number(objective.currentWindow.actual), target: Number(objective.currentWindow.target) }
+        : null,
     })),
   }
 }
@@ -1009,6 +1193,18 @@ function toObjectiveRecord(objective: ApiGoalObjective) {
     cycleStartDate: objective.cycleStartDate,
     cycleEndDate: objective.cycleEndDate,
     cycleStatus: CYCLE_STATUS_FROM_API[objective.cycleStatus],
+    parentObjectiveId: objective.parentObjectiveId,
+    sourceBinding: objective.sourceBinding
+      ? {
+          sourceType: objective.sourceBinding.sourceType === 'HABITS' ? 'habits' as const : 'manual' as const,
+          sourceIds: objective.sourceBinding.sourceIds,
+          aggregation: GOAL_AGGREGATION_FROM_API[objective.sourceBinding.aggregation],
+          evaluationMode: objective.sourceBinding.evaluationMode === 'RECURRING' ? 'recorrente' as const : 'total' as const,
+          cadence: objective.sourceBinding.cadence ? GOAL_CADENCE_FROM_API[objective.sourceBinding.cadence] : null,
+          targetPerWindow: objective.sourceBinding.targetPerWindow === null ? null : Number(objective.sourceBinding.targetPerWindow),
+          allowCarryover: objective.sourceBinding.allowCarryover,
+        }
+      : null,
   }
 }
 
@@ -1019,6 +1215,8 @@ function cyclePayload(input: GoalCycleInput) {
     endDate: input.endDate,
     expectedErrorMargin: input.expectedErrorMargin.toFixed(2),
     note: input.note ?? undefined,
+    cycleType: CYCLE_TYPE_TO_API[input.cycleType ?? 'personalizado'],
+    parentCycleId: input.parentCycleId ?? undefined,
   }
 }
 
@@ -1034,5 +1232,13 @@ function objectivePayload(input: GoalObjectiveInput) {
     weight: input.weight.toFixed(2),
     expectedErrorMargin:
       input.expectedErrorMargin === null ? undefined : input.expectedErrorMargin.toFixed(2),
+    parentObjectiveId: input.parentObjectiveId ?? undefined,
+    sourceType: input.sourceBinding?.sourceType === 'habits' ? 'HABITS' : 'MANUAL',
+    sourceIds: input.sourceBinding?.sourceIds,
+    aggregation: input.sourceBinding ? GOAL_AGGREGATION_TO_API[input.sourceBinding.aggregation] : undefined,
+    evaluationMode: input.sourceBinding?.evaluationMode === 'recorrente' ? 'RECURRING' : 'TOTAL',
+    cadence: input.sourceBinding?.cadence ? GOAL_CADENCE_TO_API[input.sourceBinding.cadence] : undefined,
+    targetPerWindow: input.sourceBinding?.targetPerWindow?.toFixed(2),
+    allowCarryover: input.sourceBinding?.allowCarryover,
   }
 }

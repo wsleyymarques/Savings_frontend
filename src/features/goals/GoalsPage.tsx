@@ -60,7 +60,7 @@ export function GoalsPage() {
                         <Icon name="trending" size={16} />
                       </span>
                       <div className="item-row__main">
-                        <Link className="item-row__title" to={`/metas/${cycle.id}`}>
+                        <Link className="item-row__title" to={`/habits/metas/${cycle.id}`}>
                           {cycle.name}
                         </Link>
                         <span className="item-row__meta">

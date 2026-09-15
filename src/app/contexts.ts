@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import type { Id, User } from '../data/types'
-import type { CommitmentOccurrence } from '../services/contracts'
+import type { CommitmentOccurrence, HabitDailyItem } from '../services/contracts'
 
 /**
  * Context guarda apenas sessão, escopo de conta e estado de interface.
@@ -65,6 +65,9 @@ export type DrawerRequest =
   | { kind: 'ciclo-meta'; id?: Id }
   | { kind: 'objetivo-meta'; cycleId: Id; id?: Id }
   | { kind: 'progresso-meta'; objectiveId: Id }
+  | { kind: 'habito'; id?: Id }
+  | { kind: 'item-habito'; date: string }
+  | { kind: 'registro-habito'; item: HabitDailyItem }
 
 export interface DrawerValue {
   request: DrawerRequest | null

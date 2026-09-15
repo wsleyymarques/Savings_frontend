@@ -48,7 +48,7 @@ export function FirstAccountPage() {
       <form className="auth__card auth__card--wide" onSubmit={handleSubmit} noValidate>
         <p className="auth__brand">
           <span className="sidebar__mark" aria-hidden="true" />
-          Minhas Finanças
+          Wesley Hub · Savings
         </p>
         <h1 className="auth__title">Vamos cadastrar sua primeira conta</h1>
         <p className="text-secondary">

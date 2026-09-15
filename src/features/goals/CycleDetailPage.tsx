@@ -175,7 +175,7 @@ function CycleDetail({ detail }: { detail: GoalCycleDetail }) {
               removeCycle.mutate(detail.id, {
                 onSuccess: () => {
                   toast.notify('Ciclo removido')
-                  navigate('/metas')
+                  navigate('/habits/metas')
                 },
               })
             }
@@ -202,7 +202,9 @@ function ObjectiveCard({
   const abandon = useAbandonGoalObjectiveMutation()
   const remove = useDeleteGoalObjectiveMutation()
 
-  const progressLabel =
+  const progressLabel = objective.currentWindow
+    ? `${formatGoalValue(objective.currentWindow.actual, objective.unit)} de ${formatGoalValue(objective.currentWindow.target, objective.unit)} na janela atual`
+    :
     objective.metricType === 'conclusao'
       ? objective.currentValue >= 1
         ? 'Concluído'
@@ -248,6 +250,7 @@ function ObjectiveCard({
       </div>
 
       <div className="row">
+        {objective.sourceType === 'habits' ? <Badge tone="info">Automático pelo Habits</Badge> : null}
         <Badge tone={objective.withinMargin ? 'success' : 'danger'}>
           {objective.withinMargin ? 'Dentro da margem' : 'Fora da margem'}
         </Badge>
@@ -257,14 +260,14 @@ function ObjectiveCard({
       </div>
 
       <div className="item-row__actions">
-        <Button
+        {objective.sourceType === 'habits' ? null : <Button
           variant="secondary"
           icon="plus"
           disabled={readOnly}
           onClick={() => drawer.open({ kind: 'progresso-meta', objectiveId: objective.id })}
         >
           Registrar progresso
-        </Button>
+        </Button>}
         <Button
           variant="ghost"
           icon="edit"

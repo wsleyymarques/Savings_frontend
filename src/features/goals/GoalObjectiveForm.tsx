@@ -2,8 +2,8 @@ import { FormDrawer } from '../../components/layout/FormDrawer'
 import { SelectField, TextField } from '../../components/ui/Field'
 import { useToast } from '../../components/ui/toastContext'
 import { formatDecimalInput, parseDecimalInput, METRIC_LABEL } from '../../lib/goals'
-import type { GoalDirection, GoalMetricType, GoalObjectiveInput } from '../../services'
-import { useGoalObjectiveMutation, useGoalObjectiveQuery } from '../../services/queries'
+import type { GoalAggregation, GoalCadence, GoalDirection, GoalEvaluationMode, GoalMetricType, GoalObjectiveInput, GoalSourceType } from '../../services'
+import { useGoalObjectiveMutation, useGoalObjectiveQuery, useHabitsQuery } from '../../services/queries'
 import type { Id } from '../../data/types'
 import { DrawerRecord } from '../shared/DrawerFallback'
 import { useDrawerForm } from '../shared/useDrawerForm'
@@ -31,6 +31,7 @@ export function GoalObjectiveForm({ cycleId, objectiveId, onClose }: GoalObjecti
           unit: null,
           weight: 1,
           expectedErrorMargin: null,
+          sourceBinding: null,
         }}
         onClose={onClose}
       />
@@ -53,6 +54,8 @@ export function GoalObjectiveForm({ cycleId, objectiveId, onClose }: GoalObjecti
             unit: objective.unit,
             weight: objective.weight,
             expectedErrorMargin: objective.expectedErrorMargin,
+            parentObjectiveId: objective.parentObjectiveId ?? null,
+            sourceBinding: objective.sourceBinding ?? null,
           }}
           onClose={onClose}
         />
@@ -73,6 +76,7 @@ function ObjectiveFields({
   onClose: () => void
 }) {
   const mutation = useGoalObjectiveMutation(cycleId, objectiveId)
+  const habits = useHabitsQuery()
   const toast = useToast()
   const form = useDrawerForm({
     title: initial.title,
@@ -85,18 +89,33 @@ function ObjectiveFields({
     weight: formatDecimalInput(initial.weight),
     expectedErrorMargin:
       initial.expectedErrorMargin === null ? '' : formatDecimalInput(initial.expectedErrorMargin),
+    sourceType: initial.sourceBinding?.sourceType ?? ('manual' as GoalSourceType),
+    sourceId: initial.sourceBinding?.sourceIds[0] ?? '',
+    aggregation: initial.sourceBinding?.aggregation ?? ('dias-concluidos' as GoalAggregation),
+    evaluationMode: initial.sourceBinding?.evaluationMode ?? ('total' as GoalEvaluationMode),
+    cadence: initial.sourceBinding?.cadence ?? ('semanal' as GoalCadence),
+    targetPerWindow: initial.sourceBinding?.targetPerWindow
+      ? formatDecimalInput(initial.sourceBinding.targetPerWindow)
+      : '3',
   })
 
-  const metricType = form.values.metricType
+  const automatic = form.values.sourceType === 'habits'
+  const selectedHabit = habits.data?.find((habit) => habit.id === form.values.sourceId)
+  const metricType = automatic
+    ? form.values.aggregation === 'duracao' || form.values.aggregation === 'soma'
+      ? 'valor'
+      : 'contagem'
+    : form.values.metricType
   // Conclusão não tem alvo numérico; contagem sempre cresce a partir da linha de base.
   const isCompletion = metricType === 'conclusao'
   const allowsDirection = metricType === 'valor' || metricType === 'percentual'
-  const direction = allowsDirection ? form.values.direction : 'aumentar'
+  const direction = automatic ? 'aumentar' : allowsDirection ? form.values.direction : 'aumentar'
   const maxValue = metricType === 'percentual' ? 100 : undefined
 
   async function submit() {
     const errors: Record<string, string> = {}
     if (!form.values.title.trim()) errors.title = 'Informe o objetivo.'
+    if (automatic && !form.values.sourceId) errors.sourceId = 'Selecione o hábito.'
 
     const weight = parseDecimalInput(form.values.weight, { min: 0.01, label: 'peso' })
     if (!weight.ok) errors.weight = weight.reason
@@ -109,7 +128,10 @@ function ObjectiveFields({
         max: maxValue,
         label: 'valor',
       })
-      const target = parseDecimalInput(form.values.targetValue, {
+      const targetSource = automatic && form.values.evaluationMode === 'recorrente'
+        ? form.values.targetPerWindow
+        : form.values.targetValue
+      const target = parseDecimalInput(targetSource, {
         min: 0,
         max: maxValue,
         label: 'alvo',
@@ -117,7 +139,7 @@ function ObjectiveFields({
       if (!baseline.ok) errors.baselineValue = baseline.reason
       if (!target.ok) errors.targetValue = target.reason
       if (baseline.ok && target.ok) {
-        baselineValue = baseline.value
+        baselineValue = automatic ? 0 : baseline.value
         targetValue = target.value
         if (direction === 'reduzir' && baselineValue <= targetValue) {
           errors.targetValue = 'Em uma redução o alvo precisa ser menor que a linha de base.'
@@ -155,6 +177,21 @@ function ObjectiveFields({
         unit: isCompletion ? null : form.values.unit.trim() || null,
         weight: weight.ok ? weight.value : 1,
         expectedErrorMargin: margin,
+        parentObjectiveId: initial.parentObjectiveId ?? null,
+        sourceBinding: automatic
+          ? {
+              sourceType: 'habits',
+              sourceIds: [form.values.sourceId],
+              aggregation: form.values.aggregation,
+              evaluationMode: form.values.evaluationMode,
+              cadence: form.values.evaluationMode === 'recorrente' ? form.values.cadence : null,
+              targetPerWindow:
+                form.values.evaluationMode === 'recorrente'
+                  ? Number(form.values.targetPerWindow.replace(',', '.'))
+                  : null,
+              allowCarryover: false,
+            }
+          : null,
       }),
     )
 
@@ -182,7 +219,45 @@ function ObjectiveFields({
         maxLength={140}
         onChange={(event) => form.patch({ title: event.target.value })}
       />
-      <SelectField
+      <SelectField label="Origem do progresso" value={form.values.sourceType} onChange={(event) => form.patch({ sourceType: event.target.value as GoalSourceType })}>
+        <option value="manual">Lançamento manual</option>
+        <option value="habits">Automático pelo Habits</option>
+      </SelectField>
+
+      {automatic ? (
+        <>
+          <SelectField label="Hábito" value={form.values.sourceId} error={form.fieldErrors.sourceId} placeholder="Selecione" onChange={(event) => {
+            const habit = habits.data?.find((item) => item.id === event.target.value)
+            form.patch({
+              sourceId: event.target.value,
+              aggregation: habit?.measurementType === 'duracao' ? 'duracao' : 'dias-concluidos',
+              unit: habit?.measurementType === 'duracao' ? 'min' : 'dias',
+            })
+          }}>
+            {(habits.data ?? []).map((habit) => <option key={habit.id} value={habit.id}>{habit.name}</option>)}
+          </SelectField>
+          <SelectField label="Como agregar" value={form.values.aggregation} onChange={(event) => form.patch({ aggregation: event.target.value as GoalAggregation })}>
+            <option value="dias-concluidos">Dias concluídos</option>
+            <option value="ocorrencias">Execuções</option>
+            {selectedHabit?.measurementType === 'duracao' ? <option value="duracao">Duração em minutos</option> : null}
+            {selectedHabit?.measurementType === 'contagem' ? <option value="soma">Somar quantidades</option> : null}
+          </SelectField>
+          <SelectField label="Forma de avaliação" value={form.values.evaluationMode} onChange={(event) => form.patch({ evaluationMode: event.target.value as GoalEvaluationMode })}>
+            <option value="total">Total no período</option>
+            <option value="recorrente">Meta recorrente</option>
+          </SelectField>
+          {form.values.evaluationMode === 'recorrente' ? (
+            <>
+              <SelectField label="Frequência" value={form.values.cadence} onChange={(event) => form.patch({ cadence: event.target.value as GoalCadence })}>
+                <option value="diaria">Diária</option>
+                <option value="semanal">Semanal</option>
+                <option value="mensal">Mensal</option>
+              </SelectField>
+              <TextField label="Mínimo por período" value={form.values.targetPerWindow} error={form.fieldErrors.targetValue} inputMode="decimal" hint="Ex.: 3 dias por semana ou 300 minutos por semana." onChange={(event) => form.patch({ targetPerWindow: event.target.value })} />
+            </>
+          ) : null}
+        </>
+      ) : <SelectField
         label="Como medir"
         value={metricType}
         hint={METRIC_HINT[metricType]}
@@ -193,7 +268,7 @@ function ObjectiveFields({
             {METRIC_LABEL[type]}
           </option>
         ))}
-      </SelectField>
+      </SelectField>}
 
       {allowsDirection ? (
         <SelectField
@@ -208,7 +283,7 @@ function ObjectiveFields({
 
       {isCompletion ? null : (
         <>
-          <TextField
+          {!automatic ? <TextField
             label={direction === 'reduzir' ? 'Linha de base (hoje)' : 'Ponto de partida'}
             value={form.values.baselineValue}
             error={form.fieldErrors.baselineValue}
@@ -219,21 +294,21 @@ function ObjectiveFields({
                 : 'Normalmente zero.'
             }
             onChange={(event) => form.patch({ baselineValue: event.target.value })}
-          />
-          <TextField
+          /> : null}
+          {automatic && form.values.evaluationMode === 'recorrente' ? null : <TextField
             label="Alvo"
             value={form.values.targetValue}
             error={form.fieldErrors.targetValue}
             inputMode="decimal"
             onChange={(event) => form.patch({ targetValue: event.target.value })}
-          />
-          <TextField
+          />}
+          {!automatic ? <TextField
             label="Unidade (opcional)"
             value={form.values.unit}
             maxLength={24}
             placeholder={metricType === 'percentual' ? '%' : 'dias, dívidas, R$'}
             onChange={(event) => form.patch({ unit: event.target.value })}
-          />
+          /> : null}
         </>
       )}
 

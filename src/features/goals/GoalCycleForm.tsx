@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom'
 import { FormDrawer } from '../../components/layout/FormDrawer'
-import { DateField, TextField } from '../../components/ui/Field'
+import { DateField, SelectField, TextField } from '../../components/ui/Field'
 import { useToast } from '../../components/ui/toastContext'
 import { formatDecimalInput, parseDecimalInput } from '../../lib/goals'
 import { useGoalCycleMutation, useGoalCycleQuery } from '../../services/queries'
-import type { GoalCycleInput } from '../../services'
+import type { GoalCycleInput, GoalCycleType } from '../../services'
 import type { Id } from '../../data/types'
 import { DrawerRecord } from '../shared/DrawerFallback'
 import { useDrawerForm } from '../shared/useDrawerForm'
@@ -27,6 +27,8 @@ export function GoalCycleForm({ cycleId, onClose }: GoalCycleFormProps) {
           endDate: end,
           expectedErrorMargin: 10,
           note: null,
+          cycleType: 'trimestral',
+          parentCycleId: null,
         }}
         onClose={onClose}
       />
@@ -44,6 +46,8 @@ export function GoalCycleForm({ cycleId, onClose }: GoalCycleFormProps) {
             endDate: cycle.endDate,
             expectedErrorMargin: cycle.expectedErrorMargin,
             note: cycle.note,
+            cycleType: cycle.cycleType ?? 'personalizado',
+            parentCycleId: cycle.parentCycleId ?? null,
           }}
           onClose={onClose}
         />
@@ -70,6 +74,7 @@ function CycleFields({
     endDate: initial.endDate,
     expectedErrorMargin: formatDecimalInput(initial.expectedErrorMargin),
     note: initial.note ?? '',
+    cycleType: initial.cycleType ?? ('personalizado' as GoalCycleType),
   })
 
   async function submit() {
@@ -99,6 +104,8 @@ function CycleFields({
         endDate: form.values.endDate,
         expectedErrorMargin: margin.ok ? margin.value : 0,
         note: form.values.note.trim() || null,
+        cycleType: form.values.cycleType,
+        parentCycleId: initial.parentCycleId ?? null,
       })
       if (!cycleId) createdId = id
     })
@@ -106,7 +113,7 @@ function CycleFields({
     if (ok) {
       toast.notify(cycleId ? 'Ciclo atualizado' : 'Ciclo criado')
       onClose()
-      if (createdId) navigate(`/metas/${createdId}`)
+      if (createdId) navigate(`/habits/metas/${createdId}`)
     }
   }
 
@@ -128,6 +135,20 @@ function CycleFields({
         maxLength={120}
         onChange={(event) => form.patch({ name: event.target.value })}
       />
+      <SelectField
+        label="Tipo de ciclo"
+        value={form.values.cycleType}
+        onChange={(event) => {
+          const cycleType = event.target.value as GoalCycleType
+          const window = presetWindow(cycleType, form.values.startDate)
+          form.patch({ cycleType, ...(window ?? {}) })
+        }}
+      >
+        <option value="anual">Anual</option>
+        <option value="semestral">Semestral</option>
+        <option value="trimestral">Trimestral</option>
+        <option value="personalizado">Personalizado</option>
+      </SelectField>
       <DateField
         label="Início"
         value={form.values.startDate}
@@ -171,4 +192,21 @@ function currentQuarter(): { start: string; end: string } {
 function quarterName(start: string): string {
   const month = Number(start.slice(5, 7))
   return `${Math.floor((month - 1) / 3) + 1}º trimestre de ${start.slice(0, 4)}`
+}
+
+function presetWindow(type: GoalCycleType, anchor: string): { startDate: string; endDate: string } | null {
+  if (type === 'personalizado') return null
+  const base = anchor || new Date().toISOString().slice(0, 10)
+  const year = Number(base.slice(0, 4))
+  const month = Number(base.slice(5, 7))
+  if (type === 'anual') return { startDate: `${year}-01-01`, endDate: `${year}-12-31` }
+  if (type === 'semestral') {
+    return month <= 6
+      ? { startDate: `${year}-01-01`, endDate: `${year}-06-30` }
+      : { startDate: `${year}-07-01`, endDate: `${year}-12-31` }
+  }
+  const firstMonth = Math.floor((month - 1) / 3) * 3
+  const start = new Date(Date.UTC(year, firstMonth, 1))
+  const end = new Date(Date.UTC(year, firstMonth + 3, 0))
+  return { startDate: start.toISOString().slice(0, 10), endDate: end.toISOString().slice(0, 10) }
 }

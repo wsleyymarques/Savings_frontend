@@ -24,6 +24,9 @@ import type {
   GoalObjectiveRecord,
   GoalObjectiveRow,
   GoalProgressEntry,
+  HabitDailyItem,
+  HabitDefinition,
+  HabitStats,
   InvoiceDetail,
   OverviewSummary,
   PlannedExpense,
@@ -64,6 +67,8 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
   const goalCycles: MockCycle[] = []
   const goalObjectives: MockObjective[] = []
   const goalProgress: Array<GoalProgressEntry & { objectiveId: string }> = []
+  const habits: HabitDefinition[] = []
+  const habitItems: HabitDailyItem[] = []
 
   function cycleOrFail(id: string): MockCycle {
     const cycle = goalCycles.find((item) => item.id === id)
@@ -77,13 +82,56 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
     return objective
   }
 
+  function refreshSourcedObjective(cycle: MockCycle, objective: MockObjective): void {
+    const binding = objective.sourceBinding
+    if (!binding || binding.sourceType !== 'habits') return
+    const selected = habitItems.filter(
+      (item) =>
+        item.habitId !== null &&
+        binding.sourceIds.includes(item.habitId) &&
+        item.plannedOn >= cycle.startDate &&
+        item.plannedOn <= cycle.endDate,
+    )
+    const value = (rows: HabitDailyItem[]) => {
+      if (binding.aggregation === 'dias-concluidos') {
+        return new Set(rows.filter((item) => item.completed).map((item) => item.plannedOn)).size
+      }
+      if (binding.aggregation === 'ocorrencias') {
+        return rows.reduce((total, item) => total + item.records.length, 0)
+      }
+      return rows.reduce((total, item) => total + item.currentValue, 0)
+    }
+    const total = value(selected)
+    if (binding.evaluationMode === 'total') {
+      objective.currentValue = total
+    } else {
+      const target = binding.targetPerWindow ?? objective.targetValue
+      const weeks = new Map<string, HabitDailyItem[]>()
+      for (const item of selected) {
+        const key = mockWeekStart(item.plannedOn)
+        weeks.set(key, [...(weeks.get(key) ?? []), item])
+      }
+      const currentWeek = mockWeekStart(todayIso())
+      const closed = [...weeks.entries()].filter(([start]) => start < currentWeek)
+      const attainment = closed.length
+        ? closed.reduce((sum, [, rows]) => sum + Math.min(value(rows) / target, 1), 0) / closed.length
+        : 0
+      objective.currentValue = attainment * objective.targetValue
+    }
+    if (objective.status !== 'abandonado') {
+      objective.status = objective.currentValue >= objective.targetValue ? 'alcancado' : 'ativo'
+    }
+  }
+
   function summaryOf(cycle: MockCycle): GoalCycleSummary {
     const objectives = goalObjectives.filter((item) => item.cycleId === cycle.id)
+    objectives.forEach((objective) => refreshSourcedObjective(cycle, objective))
     const reference = cycle.closedOn ?? todayIso()
     return { ...cycle, ...summarize(cycle, objectives, reference) }
   }
 
   function rowOf(cycle: MockCycle, objective: MockObjective): GoalObjectiveRow {
+    refreshSourcedObjective(cycle, objective)
     const attainment = attainmentOf(objective)
     const errorPercent = Math.round((1 - attainment) * 10_000) / 100
     const margin = objective.expectedErrorMargin ?? cycle.expectedErrorMargin
@@ -93,6 +141,24 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
       attainment: Math.round(attainment * 10_000) / 10_000,
       errorPercent,
       withinMargin: errorPercent <= margin,
+      sourceType: objective.sourceBinding?.sourceType ?? 'manual',
+      evaluationMode: objective.sourceBinding?.evaluationMode ?? 'total',
+      cadence: objective.sourceBinding?.cadence ?? null,
+      currentWindow:
+        objective.sourceBinding?.evaluationMode === 'recorrente'
+          ? {
+              actual: mockBindingValue(
+                habitItems.filter(
+                  (item) =>
+                    item.habitId !== null &&
+                    objective.sourceBinding!.sourceIds.includes(item.habitId) &&
+                    mockWeekStart(item.plannedOn) === mockWeekStart(todayIso()),
+                ),
+                objective.sourceBinding.aggregation,
+              ),
+              target: objective.sourceBinding.targetPerWindow ?? objective.targetValue,
+            }
+          : null,
     }
   }
 
@@ -800,7 +866,191 @@ export function createMockServices(options: { failing?: boolean } = {}): Service
         recalculate(objectiveOrFail(entry.objectiveId))
       },
     },
+
+    habits: {
+      async list(includeArchived = false) {
+        return habits
+          .filter((habit) => includeArchived || habit.active)
+          .sort((a, b) => a.name.localeCompare(b.name))
+      },
+      async create(input) {
+        const name = input.name.trim()
+        if (!name) throw new DataError('Informe o nome do hábito.')
+        const habit: HabitDefinition = {
+          id: crypto.randomUUID(),
+          ...input,
+          name,
+          unit:
+            input.measurementType === 'duracao'
+              ? 'min'
+              : input.measurementType === 'check'
+                ? null
+                : input.unit || 'vezes',
+          defaultDailyTarget: input.measurementType === 'check' ? 1 : input.defaultDailyTarget,
+          active: true,
+        }
+        if (habit.defaultDailyTarget <= 0) throw new DataError('Informe um alvo diário positivo.')
+        habits.push(habit)
+        return habit.id
+      },
+      async update(id, input) {
+        const habit = habits.find((candidate) => candidate.id === id)
+        if (!habit) throw new DataError('Hábito não encontrado.')
+        Object.assign(habit, input, {
+          name: input.name.trim(),
+          unit:
+            input.measurementType === 'duracao'
+              ? 'min'
+              : input.measurementType === 'check'
+                ? null
+                : input.unit || 'vezes',
+          defaultDailyTarget: input.measurementType === 'check' ? 1 : input.defaultDailyTarget,
+        })
+      },
+      async day(date) {
+        return mockHabitDay(date, habitItems)
+      },
+      async addItem(date, input) {
+        const habit = input.habitId
+          ? habits.find((candidate) => candidate.id === input.habitId)
+          : null
+        if (input.habitId && !habit) throw new DataError('Hábito não encontrado.')
+        if (!habit && (!input.title?.trim() || !input.measurementType)) {
+          throw new DataError('Informe os dados da atividade.')
+        }
+        const measurementType = habit?.measurementType ?? input.measurementType!
+        const target = measurementType === 'check' ? 1 : (input.targetValue ?? habit?.defaultDailyTarget ?? 0)
+        if (target <= 0) throw new DataError('Informe um alvo positivo.')
+        habitItems.push({
+          id: crypto.randomUUID(),
+          plannedOn: date,
+          habitId: habit?.id ?? null,
+          title: habit?.name ?? input.title!.trim(),
+          measurementType,
+          targetValue: target,
+          currentValue: 0,
+          unit: measurementType === 'duracao' ? 'min' : measurementType === 'check' ? null : habit?.unit ?? input.unit ?? 'vezes',
+          position: habitItems.filter((item) => item.plannedOn === date).length,
+          state: 'planejado',
+          completed: false,
+          records: [],
+        })
+      },
+      async updateItem(id, input) {
+        const item = habitItems.find((candidate) => candidate.id === id)
+        if (!item) throw new DataError('Item do dia não encontrado.')
+        if (input.plannedOn) item.plannedOn = input.plannedOn
+        if (input.targetValue !== undefined) item.targetValue = input.targetValue
+        if (input.state) item.state = input.state
+        refreshMockHabitItem(item)
+      },
+      async deleteItem(id) {
+        const index = habitItems.findIndex((candidate) => candidate.id === id)
+        if (index < 0) throw new DataError('Item do dia não encontrado.')
+        if (habitItems[index].records.length) {
+          throw new DataError('Remova as execuções antes de excluir o item.')
+        }
+        habitItems.splice(index, 1)
+      },
+      async addRecord(itemId, input) {
+        const item = habitItems.find((candidate) => candidate.id === itemId)
+        if (!item) throw new DataError('Item do dia não encontrado.')
+        if (item.measurementType === 'check' && item.records.length) return
+        let value = input.value ?? 0
+        if (input.startedAt && input.endedAt) {
+          value = (Date.parse(input.endedAt) - Date.parse(input.startedAt)) / 60_000
+        }
+        if (item.measurementType === 'check') value = 1
+        if (value <= 0) throw new DataError('Informe uma execução positiva.')
+        item.records.push({
+          id: crypto.randomUUID(),
+          value,
+          startedAt: input.startedAt ?? null,
+          endedAt: input.endedAt ?? null,
+          note: input.note,
+        })
+        refreshMockHabitItem(item)
+      },
+      async deleteRecord(id) {
+        const item = habitItems.find((candidate) => candidate.records.some((record) => record.id === id))
+        if (!item) throw new DataError('Registro não encontrado.')
+        item.records.splice(item.records.findIndex((record) => record.id === id), 1)
+        refreshMockHabitItem(item)
+      },
+      async stats(from, to, habitId) {
+        const selected = habitItems.filter(
+          (item) => item.plannedOn >= from && item.plannedOn <= to && (!habitId || item.habitId === habitId),
+        )
+        return mockHabitStats(from, to, selected)
+      },
+    },
   }
+}
+
+function refreshMockHabitItem(item: HabitDailyItem): void {
+  item.currentValue = item.records.reduce((total, record) => total + record.value, 0)
+  item.completed = item.state !== 'ignorado' && item.currentValue >= item.targetValue
+}
+
+function mockHabitDay(date: string, items: HabitDailyItem[]) {
+  const selected = items.filter((item) => item.plannedOn === date).sort((a, b) => a.position - b.position)
+  const completed = selected.filter((item) => item.completed).length
+  return {
+    date,
+    planned: selected.length,
+    completed,
+    completionRate: selected.length ? (completed / selected.length) * 100 : 0,
+    items: selected,
+  }
+}
+
+function mockHabitStats(from: string, to: string, items: HabitDailyItem[]): HabitStats {
+  const aggregate = (rows: HabitDailyItem[]) => ({
+    planned: rows.length,
+    completed: rows.filter((item) => item.completed).length,
+    skipped: rows.filter((item) => item.state === 'ignorado').length,
+    adherence: rows.length ? (rows.filter((item) => item.completed).length / rows.length) * 100 : 0,
+    activeDays: new Set(rows.filter((item) => item.records.length).map((item) => item.plannedOn)).size,
+    durationMinutes: rows
+      .filter((item) => item.measurementType === 'duracao')
+      .reduce((total, item) => total + item.currentValue, 0),
+    countValue: rows
+      .filter((item) => item.measurementType === 'contagem')
+      .reduce((total, item) => total + item.currentValue, 0),
+  })
+  const groups = new Map<string, HabitDailyItem[]>()
+  for (const item of items) {
+    const key = item.habitId ?? `avulso:${item.title}`
+    groups.set(key, [...(groups.get(key) ?? []), item])
+  }
+  return {
+    from,
+    to,
+    ...aggregate(items),
+    habits: [...groups.entries()].map(([key, rows]) => ({
+      habitId: key.startsWith('avulso:') ? null : key,
+      name: rows[0].title,
+      ...aggregate(rows),
+    })),
+  }
+}
+
+function mockWeekStart(date: string): string {
+  const value = new Date(`${date}T00:00:00Z`)
+  const isoDay = value.getUTCDay() || 7
+  value.setUTCDate(value.getUTCDate() + 1 - isoDay)
+  return value.toISOString().slice(0, 10)
+}
+
+function mockBindingValue(
+  rows: HabitDailyItem[],
+  aggregation: NonNullable<GoalObjectiveRecord['sourceBinding']>['aggregation'],
+): number {
+  if (aggregation === 'dias-concluidos') {
+    return new Set(rows.filter((item) => item.completed).map((item) => item.plannedOn)).size
+  }
+  if (aggregation === 'ocorrencias') return rows.reduce((total, item) => total + item.records.length, 0)
+  return rows.reduce((total, item) => total + item.currentValue, 0)
 }
 
 interface MockCycle extends Omit<GoalCycleSummary, 'realErrorMargin' | 'projectedErrorMargin' | 'deviation' | 'withinMargin' | 'elapsedFraction' | 'objectiveCount'> {

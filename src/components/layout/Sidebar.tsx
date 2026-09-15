@@ -1,38 +1,13 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { formatMoney } from '../../lib/money'
 import { useDrawer, useScope, useSession } from '../../app/contexts'
 import { useAccountScope } from '../../app/useScopeLabel'
 import { useTransactionsCountQuery } from '../../services/queries'
 import { sum } from '../../lib/money'
 import { initialsOf } from '../../lib/initials'
-import { Icon, type IconName } from '../ui/Icon'
+import { Icon } from '../ui/Icon'
 import { DropdownMenu, MenuItem, MenuLabel, MenuSeparator } from '../ui/DropdownMenu'
-
-interface NavItem {
-  to: string
-  label: string
-  icon: IconName
-}
-
-/** Uma seção por aplicação do hub; a casca e a sessão são compartilhadas. */
-const NAV_SECTIONS: { app: string; items: NavItem[] }[] = [
-  {
-    app: 'Finanças',
-    items: [
-      { to: '/visao-geral', label: 'Visão geral', icon: 'visao-geral' },
-      { to: '/lancamentos', label: 'Lançamentos', icon: 'lancamentos' },
-      { to: '/planejamento', label: 'Planejamento', icon: 'planejamento' },
-      { to: '/contas', label: 'Contas', icon: 'contas' },
-      { to: '/cartoes', label: 'Cartões', icon: 'cartoes' },
-      { to: '/faturas', label: 'Faturas', icon: 'faturas' },
-      { to: '/categorias', label: 'Categorias', icon: 'categorias' },
-    ],
-  },
-  {
-    app: 'Metas',
-    items: [{ to: '/metas', label: 'Ciclos e objetivos', icon: 'trending' }],
-  },
-]
+import { HUB_MODULES, moduleForPath, routeForModule } from '../../app/modules'
 
 interface SidebarProps {
   open: boolean
@@ -42,8 +17,11 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, collapsed, onToggleCollapsed, onNavigate }: SidebarProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const activeModule = moduleForPath(location.pathname)
   const { accountId, setAccountId } = useScope()
-  const { accounts, accountsQuery, scopeLabel } = useAccountScope()
+  const { accounts, accountsQuery, scopeLabel } = useAccountScope(activeModule.id === 'finance')
   const { user, signOut, status } = useSession()
   const drawer = useDrawer()
 
@@ -52,7 +30,10 @@ export function Sidebar({ open, collapsed, onToggleCollapsed, onNavigate }: Side
   const scopeBalance = selected ? selected.currentBalance : consolidated
 
   // Contagem real da listagem sob o escopo atual; oculta enquanto não estiver disponível.
-  const count = useTransactionsCountQuery({ accountId }, status === 'authenticated')
+  const count = useTransactionsCountQuery(
+    { accountId },
+    activeModule.id === 'finance' && status === 'authenticated',
+  )
 
   return (
     <nav
@@ -63,9 +44,9 @@ export function Sidebar({ open, collapsed, onToggleCollapsed, onNavigate }: Side
       id="navegacao-principal"
     >
       <div className="sidebar__header">
-        <NavLink className="sidebar__brand" to="/visao-geral" onClick={onNavigate}>
+        <NavLink className="sidebar__brand" to={activeModule.home} onClick={onNavigate}>
           <span className="sidebar__mark" aria-hidden="true" />
-          <span className="sidebar__brand-text">Minhas Finanças</span>
+          <span className="sidebar__brand-text">Wesley Hub</span>
         </NavLink>
         <button
           type="button"
@@ -81,7 +62,7 @@ export function Sidebar({ open, collapsed, onToggleCollapsed, onNavigate }: Side
         </button>
       </div>
 
-      <div className="sidebar__scope">
+      {activeModule.id === 'finance' ? <div className="sidebar__scope">
         <DropdownMenu
           label="Escolher conta financeira"
           trigger={({ ref, ...props }) => (
@@ -147,13 +128,12 @@ export function Sidebar({ open, collapsed, onToggleCollapsed, onNavigate }: Side
             </>
           )}
         </DropdownMenu>
-      </div>
+      </div> : null}
 
-      {NAV_SECTIONS.map((section) => (
-        <div key={section.app} className="sidebar__section">
-          <p className="sidebar__section-label">{section.app}</p>
+      <div className="sidebar__section">
+          <p className="sidebar__section-label">{activeModule.name}</p>
           <ul className="sidebar__nav">
-            {section.items.map((item) => (
+            {activeModule.items.map((item) => (
               <li key={item.to}>
                 <NavLink
                   to={item.to}
@@ -172,8 +152,7 @@ export function Sidebar({ open, collapsed, onToggleCollapsed, onNavigate }: Side
               </li>
             ))}
           </ul>
-        </div>
-      ))}
+      </div>
 
       <div className="sidebar__spacer" />
 
@@ -200,6 +179,21 @@ export function Sidebar({ open, collapsed, onToggleCollapsed, onNavigate }: Side
         >
           {(close) => (
             <>
+              <MenuLabel>Módulos</MenuLabel>
+              {(Object.values(HUB_MODULES)).map((module) => (
+                <MenuItem
+                  key={module.id}
+                  checked={module.id === activeModule.id}
+                  onClick={() => {
+                    close()
+                    onNavigate()
+                    navigate(routeForModule(module))
+                  }}
+                >
+                  {module.name}
+                </MenuItem>
+              ))}
+              <MenuSeparator />
               <MenuItem
                 onClick={() => {
                   close()

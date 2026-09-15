@@ -39,7 +39,7 @@ export function SignUpPage() {
       <form className="auth__card" onSubmit={handleSubmit} noValidate>
         <p className="auth__brand">
           <span className="sidebar__mark" aria-hidden="true" />
-          Minhas Finanças
+          Wesley Hub
         </p>
         <h1 className="auth__title">Criar cadastro</h1>
         {error ? <InlineAlert tone="danger">{error}</InlineAlert> : null}

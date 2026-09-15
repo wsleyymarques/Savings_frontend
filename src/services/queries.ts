@@ -6,6 +6,10 @@ import type {
   GoalCycleInput,
   GoalObjectiveInput,
   GoalProgressInput,
+  HabitDailyItemInput,
+  HabitInput,
+  HabitItemState,
+  HabitRecordInput,
   CardInput,
   CategoryInput,
   ExpenseInput,
@@ -209,6 +213,7 @@ type Domain =
   | 'categories'
   | 'planning'
   | 'goals'
+  | 'habits'
 
 const PREFIX: Record<Domain, readonly string[]> = {
   overview: queryKeys.overview.all,
@@ -219,6 +224,7 @@ const PREFIX: Record<Domain, readonly string[]> = {
   categories: queryKeys.categories.all,
   planning: queryKeys.planning.all,
   goals: queryKeys.goals.all,
+  habits: queryKeys.habits.all,
 }
 
 function invalidate(client: QueryClient, domains: Domain[]) {
@@ -503,5 +509,92 @@ export function useDeleteGoalProgressMutation() {
   return useMutation({
     mutationFn: (id: Id) => services.goals.deleteProgress(id),
     onSuccess: () => invalidate(client, ['goals']),
+  })
+}
+
+/* ---------------------------------- Habits --------------------------------- */
+
+export function useHabitsQuery(includeArchived = false) {
+  return useQuery({
+    queryKey: [...queryKeys.habits.list, includeArchived],
+    queryFn: () => services.habits.list(includeArchived),
+  })
+}
+
+export function useHabitDayQuery(date: string, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.habits.day(date),
+    queryFn: () => services.habits.day(date),
+    enabled: enabled && Boolean(date),
+  })
+}
+
+export function useHabitStatsQuery(from: string, to: string, habitId?: Id) {
+  return useQuery({
+    queryKey: queryKeys.habits.stats(from, to, habitId),
+    queryFn: () => services.habits.stats(from, to, habitId),
+    enabled: Boolean(from && to),
+  })
+}
+
+export function useHabitMutation(id?: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: HabitInput): Promise<Id> => {
+      if (!id) return services.habits.create(input)
+      await services.habits.update(id, input)
+      return id
+    },
+    onSuccess: () => invalidate(client, ['habits', 'goals']),
+  })
+}
+
+export function useArchiveHabitMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, input }: { id: Id; input: HabitInput }) =>
+      services.habits.update(id, { ...input, active: false }),
+    onSuccess: () => invalidate(client, ['habits', 'goals']),
+  })
+}
+
+export function useHabitItemMutation(date: string) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: HabitDailyItemInput) => services.habits.addItem(date, input),
+    onSuccess: () => invalidate(client, ['habits', 'goals']),
+  })
+}
+
+export function useHabitItemStateMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, state }: { id: Id; state: HabitItemState }) =>
+      services.habits.updateItem(id, { state }),
+    onSuccess: () => invalidate(client, ['habits', 'goals']),
+  })
+}
+
+export function useDeleteHabitItemMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.habits.deleteItem(id),
+    onSuccess: () => invalidate(client, ['habits', 'goals']),
+  })
+}
+
+export function useHabitRecordMutation(itemId: Id) {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (input: HabitRecordInput) => services.habits.addRecord(itemId, input),
+    onSuccess: () => invalidate(client, ['habits', 'goals']),
+  })
+}
+
+export function useDeleteHabitRecordMutation() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: Id) => services.habits.deleteRecord(id),
+    onSuccess: () => invalidate(client, ['habits', 'goals']),
   })
 }

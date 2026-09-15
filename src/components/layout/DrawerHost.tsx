@@ -14,6 +14,9 @@ import { RegisterCommitmentPaymentForm } from '../../features/entries/RegisterCo
 import { GoalCycleForm } from '../../features/goals/GoalCycleForm'
 import { GoalObjectiveForm } from '../../features/goals/GoalObjectiveForm'
 import { GoalProgressForm } from '../../features/goals/GoalProgressForm'
+import { HabitForm } from '../../features/habits/HabitForm'
+import { HabitItemForm } from '../../features/habits/HabitItemForm'
+import { HabitRecordForm } from '../../features/habits/HabitRecordForm'
 
 /**
  * Um único painel lateral para toda criação/edição (REQ-18).
@@ -86,6 +89,12 @@ export function DrawerHost() {
           onClose={close}
         />
       )
+    case 'habito':
+      return <HabitForm key={`habito-${request.id ?? 'novo'}`} habitId={request.id} onClose={close} />
+    case 'item-habito':
+      return <HabitItemForm key={`item-habito-${request.date}`} date={request.date} onClose={close} />
+    case 'registro-habito':
+      return <HabitRecordForm key={`registro-habito-${request.item.id}`} item={request.item} onClose={close} />
     case 'pagar-compromisso':
       return (
         <RegisterCommitmentPaymentForm

@@ -5,10 +5,10 @@ import { useScope, useSession } from './contexts'
  * Nome do escopo ativo e situação das contas do usuário.
  * Reaproveita a consulta consolidada de contas já usada pela sidebar.
  */
-export function useAccountScope() {
+export function useAccountScope(enabled = true) {
   const { accountId } = useScope()
   const { status } = useSession()
-  const accounts = useAccountsQuery({ accountId: null }, status === 'authenticated')
+  const accounts = useAccountsQuery({ accountId: null }, enabled && status === 'authenticated')
 
   const selected = accounts.data?.find((account) => account.id === accountId)
 

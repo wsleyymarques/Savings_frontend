@@ -17,6 +17,9 @@ import { CategoriesPage } from '../features/categories/CategoriesPage'
 import { PlanningPage } from '../features/planning/PlanningPage'
 import { GoalsPage } from '../features/goals/GoalsPage'
 import { CycleDetailPage } from '../features/goals/CycleDetailPage'
+import { TodayPage } from '../features/habits/TodayPage'
+import { RoutinePage } from '../features/habits/RoutinePage'
+import { HabitStatsPage } from '../features/habits/HabitStatsPage'
 
 export function App() {
   return (
@@ -37,8 +40,14 @@ export function App() {
           <Route path="/faturas/:id" element={<InvoiceDetailPage />} />
           <Route path="/categorias" element={<CategoriesPage />} />
           <Route path="/planejamento" element={<PlanningPage />} />
-          <Route path="/metas" element={<GoalsPage />} />
-          <Route path="/metas/:id" element={<CycleDetailPage />} />
+          <Route path="/habits" element={<Navigate to="/habits/hoje" replace />} />
+          <Route path="/habits/hoje" element={<TodayPage />} />
+          <Route path="/habits/rotina" element={<RoutinePage />} />
+          <Route path="/habits/estatisticas" element={<HabitStatsPage />} />
+          <Route path="/habits/metas" element={<GoalsPage />} />
+          <Route path="/habits/metas/:id" element={<CycleDetailPage />} />
+          <Route path="/metas" element={<Navigate to="/habits/metas" replace />} />
+          <Route path="/metas/:id" element={<LegacyGoalRedirect />} />
           <Route path="/perfil" element={<ProfileRoute />} />
         </Route>
       </Route>
@@ -46,4 +55,9 @@ export function App() {
       <Route path="*" element={<Navigate to="/visao-geral" replace />} />
     </Routes>
   )
+}
+
+function LegacyGoalRedirect() {
+  const id = window.location.pathname.split('/').filter(Boolean)[1]
+  return <Navigate to={id ? `/habits/metas/${id}` : '/habits/metas'} replace />
 }

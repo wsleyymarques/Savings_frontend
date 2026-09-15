@@ -440,6 +440,21 @@ export interface PlanningSimulation {
 
 export type GoalCycleStatus = 'planejado' | 'ativo' | 'encerrado'
 export type GoalObjectiveStatus = 'ativo' | 'alcancado' | 'abandonado'
+export type GoalCycleType = 'personalizado' | 'anual' | 'semestral' | 'trimestral'
+export type GoalSourceType = 'manual' | 'habits'
+export type GoalAggregation = 'dias-concluidos' | 'ocorrencias' | 'soma' | 'duracao'
+export type GoalEvaluationMode = 'total' | 'recorrente'
+export type GoalCadence = 'diaria' | 'semanal' | 'mensal'
+
+export interface GoalSourceBinding {
+  sourceType: GoalSourceType
+  sourceIds: Id[]
+  aggregation: GoalAggregation
+  evaluationMode: GoalEvaluationMode
+  cadence: GoalCadence | null
+  targetPerWindow: number | null
+  allowCarryover: boolean
+}
 
 export interface GoalCycleSummary {
   id: Id
@@ -457,6 +472,8 @@ export interface GoalCycleSummary {
   withinMargin: boolean
   elapsedFraction: number
   objectiveCount: number
+  cycleType?: GoalCycleType
+  parentCycleId?: Id | null
 }
 
 export interface GoalObjectiveRow {
@@ -476,6 +493,10 @@ export interface GoalObjectiveRow {
   errorPercent: number
   withinMargin: boolean
   status: GoalObjectiveStatus
+  sourceType?: GoalSourceType
+  evaluationMode?: GoalEvaluationMode
+  cadence?: GoalCadence | null
+  currentWindow?: { actual: number; target: number } | null
 }
 
 export interface GoalCycleDetail extends GoalCycleSummary {
@@ -488,6 +509,8 @@ export interface GoalCycleInput {
   endDate: CivilDate
   expectedErrorMargin: number
   note: string | null
+  cycleType?: GoalCycleType
+  parentCycleId?: Id | null
 }
 
 export interface GoalObjectiveInput {
@@ -500,6 +523,8 @@ export interface GoalObjectiveInput {
   unit: string | null
   weight: number
   expectedErrorMargin: number | null
+  parentObjectiveId?: Id | null
+  sourceBinding?: GoalSourceBinding | null
 }
 
 export interface GoalObjectiveRecord extends GoalObjectiveInput {
@@ -511,6 +536,7 @@ export interface GoalObjectiveRecord extends GoalObjectiveInput {
   cycleStartDate: CivilDate
   cycleEndDate: CivilDate
   cycleStatus: GoalCycleStatus
+  sourceBinding?: GoalSourceBinding | null
 }
 
 export interface GoalProgressInput {
@@ -521,6 +547,99 @@ export interface GoalProgressInput {
 
 export interface GoalProgressEntry extends GoalProgressInput {
   id: Id
+}
+
+/* ---------------------------------- Habits --------------------------------- */
+
+export type HabitMeasurementType = 'check' | 'contagem' | 'duracao'
+export type HabitItemState = 'planejado' | 'ignorado'
+
+export interface HabitDefinition {
+  id: Id
+  name: string
+  description: string | null
+  color: string | null
+  measurementType: HabitMeasurementType
+  unit: string | null
+  defaultDailyTarget: number
+  active: boolean
+}
+
+export interface HabitInput {
+  name: string
+  description: string | null
+  color: string | null
+  measurementType: HabitMeasurementType
+  unit: string | null
+  defaultDailyTarget: number
+}
+
+export interface HabitActivityRecord {
+  id: Id
+  value: number
+  startedAt: string | null
+  endedAt: string | null
+  note: string | null
+}
+
+export interface HabitDailyItem {
+  id: Id
+  plannedOn: CivilDate
+  habitId: Id | null
+  title: string
+  measurementType: HabitMeasurementType
+  targetValue: number
+  currentValue: number
+  unit: string | null
+  position: number
+  state: HabitItemState
+  completed: boolean
+  records: HabitActivityRecord[]
+}
+
+export interface HabitDay {
+  date: CivilDate
+  planned: number
+  completed: number
+  completionRate: number
+  items: HabitDailyItem[]
+}
+
+export interface HabitDailyItemInput {
+  habitId?: Id
+  title?: string
+  measurementType?: HabitMeasurementType
+  targetValue?: number
+  unit?: string | null
+}
+
+export interface HabitRecordInput {
+  value?: number
+  startedAt?: string
+  endedAt?: string
+  note: string | null
+}
+
+export interface HabitStats {
+  from: CivilDate
+  to: CivilDate
+  planned: number
+  completed: number
+  skipped: number
+  adherence: number
+  activeDays: number
+  durationMinutes: number
+  countValue: number
+  habits: Array<{
+    habitId: Id | null
+    name: string
+    planned: number
+    completed: number
+    adherence: number
+    activeDays: number
+    durationMinutes: number
+    countValue: number
+  }>
 }
 
 /* ------------------------------ Services por domínio ------------------------ */
@@ -632,6 +751,19 @@ export interface GoalsService {
   deleteProgress(id: Id): Promise<void>
 }
 
+export interface HabitsService {
+  list(includeArchived?: boolean): Promise<HabitDefinition[]>
+  create(input: HabitInput): Promise<Id>
+  update(id: Id, input: HabitInput & { active?: boolean }): Promise<void>
+  day(date: CivilDate): Promise<HabitDay>
+  addItem(date: CivilDate, input: HabitDailyItemInput): Promise<void>
+  updateItem(id: Id, input: { state?: HabitItemState; plannedOn?: CivilDate; targetValue?: number }): Promise<void>
+  deleteItem(id: Id): Promise<void>
+  addRecord(itemId: Id, input: HabitRecordInput): Promise<void>
+  deleteRecord(id: Id): Promise<void>
+  stats(from: CivilDate, to: CivilDate, habitId?: Id): Promise<HabitStats>
+}
+
 export interface Services {
   auth: AuthService
   overview: OverviewService
@@ -642,4 +774,5 @@ export interface Services {
   categories: CategoriesService
   planning: PlanningService
   goals: GoalsService
+  habits: HabitsService
 }

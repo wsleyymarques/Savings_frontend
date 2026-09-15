@@ -3,6 +3,8 @@
 Versão do documento: 0.3 — V1 implementada no backend e no frontend.
 Data: 07/09/2026.
 
+> **Evolução posterior:** [SDD-WESLEY-HUB-HABITS.md](./SDD-WESLEY-HUB-HABITS.md) redefine Wesley Hub com Savings e Habits como módulos do produto e Metas como capacidade compartilhada entre eles. Este documento continua sendo a referência do comportamento já implementado; em caso de conflito sobre a nova organização do Hub ou a integração com hábitos, prevalece o SDD mais recente.
+
 ## 1. Objetivo e estágio
 
 Especificar uma segunda aplicação dentro do mesmo produto: um sistema de metas e objetivos por período, com objetivos genéricos (financeiros ou não) e um sistema de margem de erro, no qual o usuário declara antes a margem de erro esperada para o período e, ao final, compara com a margem de erro real apurada.

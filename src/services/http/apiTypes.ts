@@ -270,6 +270,8 @@ export interface ApiGoalCycle {
   status: ApiGoalCycleStatus
   closedAt: string | null
   note: string | null
+  cycleType: 'CUSTOM' | 'ANNUAL' | 'SEMESTER' | 'QUARTER'
+  parentCycleId: string | null
 }
 
 export interface ApiGoalSummary {
@@ -297,6 +299,10 @@ export interface ApiGoalObjectiveResult {
   expectedErrorMargin: string
   withinMargin: boolean
   status: ApiGoalObjectiveStatus
+  sourceType?: 'MANUAL' | 'HABITS'
+  evaluationMode?: 'TOTAL' | 'RECURRING'
+  cadence?: 'DAILY' | 'WEEKLY' | 'MONTHLY' | null
+  currentWindow?: { actual: string; target: string } | null
 }
 
 export interface ApiGoalObjective {
@@ -316,6 +322,16 @@ export interface ApiGoalObjective {
   cycleStartDate: string
   cycleEndDate: string
   cycleStatus: ApiGoalCycleStatus
+  parentObjectiveId: string | null
+  sourceBinding: {
+    sourceType: 'MANUAL' | 'HABITS'
+    sourceIds: string[]
+    aggregation: 'COMPLETED_DAYS' | 'OCCURRENCES' | 'SUM' | 'DURATION'
+    evaluationMode: 'TOTAL' | 'RECURRING'
+    cadence: 'DAILY' | 'WEEKLY' | 'MONTHLY' | null
+    targetPerWindow: string | null
+    allowCarryover: boolean
+  } | null
 }
 
 export interface ApiGoalCycleResult {
@@ -335,4 +351,70 @@ export interface ApiGoalProgressEntry {
   occurredOn: string
   value: string
   note: string | null
+}
+
+export type ApiHabitMeasurementType = 'CHECK' | 'COUNT' | 'DURATION'
+
+export interface ApiHabitDefinition {
+  id: string
+  name: string
+  description: string | null
+  color: string | null
+  measurementType: ApiHabitMeasurementType
+  unit: string | null
+  defaultDailyTarget: string
+  active: boolean
+}
+
+export interface ApiHabitActivityRecord {
+  id: string
+  value: string
+  startedAt: string | null
+  endedAt: string | null
+  note: string | null
+}
+
+export interface ApiHabitDailyItem {
+  id: string
+  plannedOn: string
+  habitId: string | null
+  title: string
+  measurementType: ApiHabitMeasurementType
+  targetValue: string
+  currentValue: string
+  unit: string | null
+  position: number
+  state: 'PLANNED' | 'SKIPPED'
+  completed: boolean
+  records: ApiHabitActivityRecord[]
+}
+
+export interface ApiHabitDay {
+  date: string
+  planned: number
+  completed: number
+  completionRate: string
+  items: ApiHabitDailyItem[]
+}
+
+export interface ApiHabitStats {
+  from: string
+  to: string
+  planned: number
+  completed: number
+  skipped: number
+  adherence: string
+  activeDays: number
+  durationMinutes: string
+  countValue: string
+  habits: Array<{
+    habitId: string | null
+    name: string
+    planned: number
+    completed: number
+    adherence: string
+    activeDays: number
+    durationMinutes: string
+    countValue: string
+  }>
 }

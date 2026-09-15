@@ -101,4 +101,12 @@ export const queryKeys = {
     objective: (id: Id) => ['metas', 'objetivo', id] as const,
     progress: (objectiveId: Id) => ['metas', 'progresso', objectiveId] as const,
   },
+
+  habits: {
+    all: ['habits'] as const,
+    list: ['habits', 'lista'] as const,
+    day: (date: string) => ['habits', 'dia', date] as const,
+    stats: (from: string, to: string, habitId?: Id) =>
+      ['habits', 'estatisticas', from, to, habitId ?? 'todos'] as const,
+  },
 } as const

@@ -5,6 +5,7 @@ import { PasswordField, TextField } from '../../components/ui/Field'
 import { InlineAlert } from '../../components/ui/States'
 import { useSession } from '../../app/contexts'
 import { fieldsFor, messageFor } from '../../services'
+import { lastHubRoute } from '../../app/modules'
 
 export function SignInPage() {
   const { status, switching, signIn } = useSession()
@@ -15,7 +16,7 @@ export function SignInPage() {
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  if (status === 'authenticated') return <Navigate to="/visao-geral" replace />
+  if (status === 'authenticated') return <Navigate to={lastHubRoute()} replace />
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault()
@@ -38,7 +39,7 @@ export function SignInPage() {
       <form className="auth__card" onSubmit={handleSubmit} noValidate>
         <p className="auth__brand">
           <span className="sidebar__mark" aria-hidden="true" />
-          Minhas Finanças
+          Wesley Hub
         </p>
         <h1 className="auth__title">{switching ? 'Entrar com outro usuário' : 'Entrar'}</h1>
         {switching ? (

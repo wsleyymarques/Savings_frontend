@@ -3,8 +3,9 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { IconButton } from '../ui/IconButton'
 import { DrawerHost } from './DrawerHost'
+import { moduleForPath, rememberModuleRoute } from '../../app/modules'
 
-const COLLAPSED_KEY = 'financas:navegacao-minimizada'
+const COLLAPSED_KEY = 'wesley-hub:navegacao-minimizada'
 
 /** A preferência de sidebar minimizada acompanha o usuário entre as sessões. */
 function readCollapsed(): boolean {
@@ -22,6 +23,7 @@ export function AppShell() {
 
   useEffect(() => {
     setNavOpen(false)
+    rememberModuleRoute(moduleForPath(location.pathname).id, location.pathname)
   }, [location.pathname])
 
   useEffect(() => {
@@ -50,7 +52,7 @@ export function AppShell() {
           aria-controls="navegacao-principal"
           onClick={() => setNavOpen(true)}
         />
-        <span className="card-title">Minhas Finanças</span>
+        <span className="card-title">Wesley Hub · {moduleForPath(location.pathname).name}</span>
       </div>
 
       <main className="shell__main">
